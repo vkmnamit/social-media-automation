@@ -1,0 +1,19 @@
+{
+  "name": "autoreel-engine",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "google-auth-library": "^10.9.1",
+    "mongodb": "^6.13.0"
+  }
+}
