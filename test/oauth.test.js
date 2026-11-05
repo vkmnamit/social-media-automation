@@ -201,6 +201,23 @@ test("configuration requires strong admin and encryption keys and a valid public
     PUBLIC_BASE_URL: "https://reel.example.test",
   };
   assert.equal(loadConfig(base).publicBaseUrl, "https://reel.example.test");
+  assert.equal(
+    loadConfig({ ...base, META_GRAPH_API_VERSION: "v19.0" }).metaGraphApiVersion,
+    "v26.0",
+  );
+  assert.equal(
+    loadConfig({ ...base, META_GRAPH_API_VERSION: "v27.0" }).metaGraphApiVersion,
+    "v27.0",
+  );
+  assert.equal(
+    loadConfig({
+      ...base,
+      NODE_ENV: "production",
+      PUBLIC_BASE_URL: "http://localhost:3000",
+      RAILWAY_PUBLIC_DOMAIN: "reel-production.up.railway.app",
+    }).publicBaseUrl,
+    "https://reel-production.up.railway.app",
+  );
   assert.equal(loadConfig(base).metaGraphApiVersion, "v26.0");
   assert.equal(loadConfig(base).supabaseMediaBucket, "autoreel-publishing");
   assert.equal(

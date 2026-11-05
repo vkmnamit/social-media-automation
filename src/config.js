@@ -48,9 +48,25 @@ export function loadConfig(env = process.env) {
   ) {
     throw new Error("TOKEN_ENCRYPTION_KEY must be a base64-encoded 32-byte key");
   }
+  const railwayDomain = env.RAILWAY_PUBLIC_DOMAIN?.trim();
+  let publicBaseUrlValue = env.PUBLIC_BASE_URL;
+  if (env.NODE_ENV === "production" && railwayDomain) {
+    let isLocalUrl = false;
+    try {
+      isLocalUrl = ["localhost", "127.0.0.1", "[::1]"].includes(
+        new URL(publicBaseUrlValue).hostname,
+      );
+    } catch {
+      isLocalUrl = false;
+    }
+    if (!publicBaseUrlValue || isLocalUrl) {
+      publicBaseUrlValue = `https://${railwayDomain.replace(/^https?:\/\//, "")}`;
+    }
+  }
+
   let publicBaseUrl;
   try {
-    publicBaseUrl = new URL(env.PUBLIC_BASE_URL || "http://localhost:3000");
+    publicBaseUrl = new URL(publicBaseUrlValue || "http://localhost:3000");
   } catch {
     throw new Error("PUBLIC_BASE_URL must be a valid absolute URL");
   }
@@ -66,10 +82,15 @@ export function loadConfig(env = process.env) {
   ) {
     throw new Error("PUBLIC_BASE_URL must use HTTPS except for localhost");
   }
-  const metaGraphApiVersion = env.META_GRAPH_API_VERSION || "v26.0";
-  if (metaGraphApiVersion && !/^v\d+\.\d+$/.test(metaGraphApiVersion)) {
+  const configuredMetaGraphApiVersion = env.META_GRAPH_API_VERSION || "v26.0";
+  const graphVersionMatch = configuredMetaGraphApiVersion.match(/^v(\d+)\.\d+$/);
+  if (!graphVersionMatch) {
     throw new Error("META_GRAPH_API_VERSION must look like vNN.N");
   }
+  const metaGraphApiVersion =
+    Number(graphVersionMatch[1]) < 26
+      ? "v26.0"
+      : configuredMetaGraphApiVersion;
 
   const maxStorageGb = positiveNumber(env, "MAX_STORAGE_GB", 10);
   const maxSafeBytes = Number.MAX_SAFE_INTEGER;

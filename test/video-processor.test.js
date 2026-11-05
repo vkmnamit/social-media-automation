@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { lstat, mkdtemp, mkdir, rm } from "node:fs/promises";
+import { chmod, lstat, mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -51,4 +51,21 @@ test("video processor creates a vertical H.264 output", async (t) => {
   assert.equal(details.height, 1920);
   assert.ok(details.durationSeconds > 0);
   assert.ok((await lstat(outputPath)).size > 0);
+
+  const failingEncoderPath = path.join(root, "failing-ffmpeg");
+  await writeFile(
+    failingEncoderPath,
+    "#!/bin/sh\nprintf 'synthetic encoder failure' >&2\nexit 7\n",
+  );
+  await chmod(failingEncoderPath, 0o755);
+  await assert.rejects(
+    processVideo({
+      ffmpegPath: failingEncoderPath,
+      ffprobePath: "ffprobe",
+      inputPath,
+      outputPath: path.join(root, "failed-output.mp4"),
+      maxOutputBytes: 16 * 1024 * 1024,
+    }),
+    /FFmpeg transcoding failed: synthetic encoder failure/,
+  );
 });

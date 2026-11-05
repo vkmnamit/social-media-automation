@@ -85,12 +85,15 @@ Configure these values in `.env`: `MAX_STORAGE_GB`, `MAX_UPLOAD_MB`,
 ## Platform OAuth and deployment
 
 For Instagram OAuth/publishing, configure `META_APP_ID`, `META_APP_SECRET`,
-and `META_GRAPH_API_VERSION` (defaults to `v26.0`). `SUPABASE_MEDIA_BUCKET`
-defaults to the private `autoreel-publishing` bucket, which the server creates
-when needed using its service-role key. Configure `GOOGLE_CLIENT_ID` and
-`GOOGLE_CLIENT_SECRET` only if YouTube is needed.
+and `META_GRAPH_API_VERSION` (defaults to `v26.0`; older versions are upgraded
+to `v26.0`). `SUPABASE_MEDIA_BUCKET` defaults to the private
+`autoreel-publishing` bucket, which the server creates when needed using its
+service-role key. Configure `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` only
+if YouTube is needed.
 Generate `TOKEN_ENCRYPTION_KEY` with `openssl rand -base64 32` and use the exact
-HTTPS service origin for `PUBLIC_BASE_URL` in production.
+HTTPS service origin for `PUBLIC_BASE_URL` in production. On Railway, when
+`PUBLIC_BASE_URL` is unset or still points at localhost, the service uses
+`RAILWAY_PUBLIC_DOMAIN` to construct its HTTPS origin.
 
 Register these callback URLs with the provider apps:
 
