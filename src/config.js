@@ -82,19 +82,49 @@ export function loadConfig(env = process.env) {
   ) {
     throw new Error("PUBLIC_BASE_URL must use HTTPS except for localhost");
   }
-  const configuredMetaOAuthMode = env.META_OAUTH_MODE || "facebook_login";
-  if (!["instagram_login", "facebook_login"].includes(configuredMetaOAuthMode)) {
-    throw new Error("META_OAUTH_MODE must be instagram_login or facebook_login");
+  const configuredMetaOAuthMode =
+    env.META_OAUTH_MODE || "facebook_login_business";
+  if (configuredMetaOAuthMode !== "facebook_login_business") {
+    throw new Error(
+      "META_OAUTH_MODE must be facebook_login_business",
+    );
   }
-  const configuredMetaGraphApiVersion = env.META_GRAPH_API_VERSION || "v27.0";
-  const graphVersionMatch = configuredMetaGraphApiVersion.match(/^v(\d+)\.\d+$/);
+  const configuredMetaGraphApiVersion = env.META_GRAPH_API_VERSION || "v26.0";
+  const graphVersionMatch = configuredMetaGraphApiVersion.match(/^v\d+\.\d+$/);
   if (!graphVersionMatch) {
     throw new Error("META_GRAPH_API_VERSION must look like vNN.N");
   }
-  const metaGraphApiVersion =
-    Number(graphVersionMatch[1]) < 27
-      ? "v27.0"
-      : configuredMetaGraphApiVersion;
+  const metaGraphApiVersion = configuredMetaGraphApiVersion;
+  const metaLoginConfigId = env.META_LOGIN_CONFIG_ID || "";
+  if (
+    configuredMetaOAuthMode === "facebook_login_business" &&
+    !metaLoginConfigId
+  ) {
+    throw new Error(
+      "META_LOGIN_CONFIG_ID is required for facebook_login_business mode",
+    );
+  }
+  const metaRedirectUri = env.META_REDIRECT_URI || "";
+  if (metaRedirectUri) {
+    let parsedMetaRedirectUri;
+    try {
+      parsedMetaRedirectUri = new URL(metaRedirectUri);
+    } catch {
+      throw new Error("META_REDIRECT_URI must be a valid absolute URL");
+    }
+    if (
+      !["https:", "http:"].includes(parsedMetaRedirectUri.protocol) ||
+      (parsedMetaRedirectUri.protocol === "http:" &&
+        !["localhost", "127.0.0.1", "[::1]"].includes(parsedMetaRedirectUri.hostname)) ||
+      parsedMetaRedirectUri.pathname !== "/oauth/meta/callback" ||
+      parsedMetaRedirectUri.username ||
+      parsedMetaRedirectUri.password ||
+      parsedMetaRedirectUri.search ||
+      parsedMetaRedirectUri.hash
+    ) {
+      throw new Error("META_REDIRECT_URI must be the HTTPS Meta callback URL");
+    }
+  }
 
   const maxStorageGb = positiveNumber(env, "MAX_STORAGE_GB", 10);
   const maxSafeBytes = Number.MAX_SAFE_INTEGER;
@@ -126,6 +156,8 @@ export function loadConfig(env = process.env) {
     publicBaseUrl: publicBaseUrl.origin,
     metaAppId: env.META_APP_ID || "",
     metaAppSecret: env.META_APP_SECRET || "",
+    metaLoginConfigId,
+    metaRedirectUri,
     metaOAuthMode: configuredMetaOAuthMode,
     metaGraphApiVersion,
     googleClientId: env.GOOGLE_CLIENT_ID || "",

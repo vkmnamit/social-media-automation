@@ -85,11 +85,13 @@ Configure these values in `.env`: `MAX_STORAGE_GB`, `MAX_UPLOAD_MB`,
 ## Platform OAuth and deployment
 
 For Instagram OAuth/publishing, configure `META_APP_ID`, `META_APP_SECRET`,
-and `META_OAUTH_MODE=instagram_login`. This flow uses Instagram Login scopes
-and does not require a Facebook Page or Instagram Login Configuration ID.
-Set `META_OAUTH_MODE=facebook_login` only when the app is configured for the
-legacy Facebook Login flow. `META_GRAPH_API_VERSION` defaults to `v27.0`;
-older versions are upgraded to `v27.0`. `SUPABASE_MEDIA_BUCKET` defaults to the private
+`META_OAUTH_MODE=facebook_login_business`, `META_LOGIN_CONFIG_ID`, and the exact
+`META_REDIRECT_URI` registered in the selected Facebook Login for Business
+configuration. The configuration supplies permissions, so the authorization
+URL omits `scope`. The callback exchanges the code for the configured System
+User Access Token, queries assigned Instagram accounts, and saves the encrypted
+token only when at least one authorized account is returned.
+`META_GRAPH_API_VERSION` defaults to `v26.0`. `SUPABASE_MEDIA_BUCKET` defaults to the private
 `autoreel-publishing` bucket, which the server creates when needed using its
 service-role key. Configure `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` only
 if YouTube is needed.

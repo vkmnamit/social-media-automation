@@ -57,6 +57,9 @@ export class InstagramPublisher extends PlatformPublisher {
         "instagram_business_content_publish",
       ];
     }
+    if (this.config.metaOAuthMode === "facebook_login_business") {
+      return ["instagram_basic", "instagram_content_publish"];
+    }
     return [
       "instagram_basic",
       "instagram_content_publish",

@@ -11,6 +11,9 @@ function createConfig(overrides = {}) {
     tokenEncryptionKey: randomBytes(32),
     metaAppId: "meta-app-id",
     metaAppSecret: "meta-app-secret",
+    metaLoginConfigId: "login-config-id",
+    metaRedirectUri: "https://reel.example.test/oauth/meta/callback",
+    metaOAuthMode: "facebook_login_business",
     metaGraphApiVersion: "v99.0",
     googleClientId: "google-client-id",
     googleClientSecret: "google-client-secret",
@@ -66,7 +69,8 @@ test("OAuth authorization URLs use configured redirect URIs and one-time state",
     metaUrl.searchParams.get("redirect_uri"),
     "https://reel.example.test/oauth/meta/callback",
   );
-  assert.ok(metaUrl.searchParams.get("scope").includes("instagram_content_publish"));
+  assert.equal(metaUrl.searchParams.get("config_id"), "login-config-id");
+  assert.equal(metaUrl.searchParams.has("scope"), false);
   assert.equal(repository.states.get(metaState).provider, "meta");
 
   const googleUrl = new URL(await service.createAuthorizationUrl("google"));
@@ -80,27 +84,24 @@ test("OAuth authorization URLs use configured redirect URIs and one-time state",
   assert.equal(repository.states.get(googleUrl.searchParams.get("state")).provider, "google");
 });
 
-test("Instagram Login authorization uses the Meta App ID and Instagram publishing scopes", async () => {
+test("Login for Business authorization uses its config ID and no scope parameter", async () => {
   const repository = new OAuthMemoryRepository();
   const service = new OAuthService({
-    config: createConfig({ metaOAuthMode: "instagram_login" }),
+    config: createConfig(),
     repository,
   });
 
   const url = new URL(await service.createAuthorizationUrl("meta"));
-  assert.equal(url.origin, "https://www.instagram.com");
-  assert.equal(url.pathname, "/oauth/authorize");
+  assert.equal(url.origin, "https://www.facebook.com");
+  assert.equal(url.pathname, "/v99.0/dialog/oauth");
   assert.equal(url.searchParams.get("client_id"), "meta-app-id");
+  assert.equal(url.searchParams.get("config_id"), "login-config-id");
   assert.equal(url.searchParams.get("response_type"), "code");
   assert.equal(
     url.searchParams.get("redirect_uri"),
     "https://reel.example.test/oauth/meta/callback",
   );
-  assert.deepEqual(url.searchParams.get("scope").split(","), [
-    "instagram_business_basic",
-    "instagram_business_content_publish",
-  ]);
-  assert.equal(url.searchParams.get("enable_fb_login"), "false");
+  assert.equal(url.searchParams.has("scope"), false);
   assert.equal(repository.states.get(url.searchParams.get("state")).provider, "meta");
 });
 
@@ -124,41 +125,23 @@ test("OAuth callback consumes matching state exactly once", async () => {
   );
 });
 
-test("Meta OAuth stores encrypted Page tokens and returns account metadata only", async () => {
+test("Login for Business callback exchanges a SUAT and saves only assigned Instagram accounts", async () => {
   const repository = new OAuthMemoryRepository();
   const config = createConfig();
   const calls = [];
   const responses = [
-    { access_token: "short-lived-user-token" },
-    { access_token: "long-lived-user-token" },
+    { access_token: "system-user-access-token", expires_in: 3600 },
     {
       data: [
-        { permission: "pages_show_list", status: "granted" },
-        { permission: "pages_read_engagement", status: "granted" },
-        { permission: "pages_manage_posts", status: "granted" },
-        { permission: "instagram_basic", status: "granted" },
-        { permission: "instagram_content_publish", status: "granted" },
-      ],
-    },
-    {
-      data: [
-        {
-          id: "page-1",
-          name: "Creator Page",
-          access_token: "page-access-token",
-          instagram_business_account: {
-            id: "instagram-1",
-            username: "creator",
-          },
-        },
+        { id: "instagram-1", username: "creator" },
       ],
     },
   ];
   const service = new OAuthService({
     config,
     repository,
-    fetchImpl: async (url) => {
-      calls.push(new URL(url));
+    fetchImpl: async (url, options) => {
+      calls.push({ url: new URL(url), options });
       return new Response(JSON.stringify(responses.shift()), {
         status: 200,
         headers: { "content-type": "application/json" },
@@ -178,79 +161,71 @@ test("Meta OAuth stores encrypted Page tokens and returns account metadata only"
   });
 
   assert.deepEqual(result, [
-    { platform: "facebook", accountId: "page-1", displayName: "Creator Page" },
     { platform: "instagram", accountId: "instagram-1", displayName: "creator" },
   ]);
-  assert.equal(repository.connections.length, 2);
-  assert.notEqual(repository.connections[0].encryptedAccessToken.ciphertext, "page-access-token");
-  assert.equal(
-    new TokenVault(config.tokenEncryptionKey).decrypt(
-      repository.connections[1].encryptedAccessToken,
-    ),
-    "page-access-token",
-  );
-  assert.ok(calls.every((url) => url.origin === "https://graph.facebook.com"));
-  const listed = await service.listConnections();
-  assert.deepEqual(listed.map((item) => item.platform), ["facebook", "instagram"]);
-  assert.equal(JSON.stringify(listed).includes("page-access-token"), false);
-});
-
-test("Instagram Login exchanges and encrypts a long-lived Instagram user token", async () => {
-  const repository = new OAuthMemoryRepository();
-  const config = createConfig({ metaOAuthMode: "instagram_login" });
-  const calls = [];
-  const responses = [
-    { access_token: "short-lived-instagram-token", user_id: "instagram-1" },
-    { access_token: "long-lived-instagram-token", expires_in: 5_184_000 },
-    { user_id: "instagram-1", username: "creator" },
-  ];
-  const service = new OAuthService({
-    config,
-    repository,
-    now: () => new Date("2026-11-04T00:00:00Z"),
-    fetchImpl: async (url, options = {}) => {
-      calls.push({ url: new URL(url), options });
-      return Response.json(responses.shift());
-    },
-  });
-  const state = "i".repeat(43);
-  await repository.createOAuthState({
-    state,
-    provider: "meta",
-    expiresAt: new Date("2026-11-04T00:10:00Z"),
-  });
-
-  const result = await service.handleCallback("meta", {
-    state,
-    code: "authorization-code",
-  });
-
-  assert.deepEqual(result, [
-    { platform: "instagram", accountId: "instagram-1", displayName: "creator" },
-  ]);
-  assert.equal(calls[0].url.origin, "https://api.instagram.com");
-  assert.equal(calls[0].url.pathname, "/oauth/access_token");
-  const exchangeBody = new URLSearchParams(calls[0].options.body);
-  assert.equal(exchangeBody.get("client_id"), config.metaAppId);
-  assert.equal(exchangeBody.get("redirect_uri"), service.callbackUrl("meta"));
-  assert.equal(exchangeBody.get("grant_type"), "authorization_code");
-  assert.equal(calls[1].url.origin, "https://graph.instagram.com");
-  assert.equal(calls[1].url.pathname, "/access_token");
-  assert.equal(calls[1].url.searchParams.get("grant_type"), "ig_exchange_token");
-  assert.equal(calls[2].url.pathname, "/v99.0/me");
-  assert.equal(calls[2].url.searchParams.get("fields"), "user_id,username");
   assert.equal(repository.connections.length, 1);
-  assert.equal(repository.connections[0].platform, "instagram");
+  assert.equal(calls.length, 2);
+  assert.equal(
+    calls[0].url.pathname,
+    "/v99.0/oauth/access_token",
+  );
+  assert.equal(calls[0].url.searchParams.get("client_id"), config.metaAppId);
+  assert.equal(calls[0].url.searchParams.get("client_secret"), config.metaAppSecret);
+  assert.equal(calls[0].url.searchParams.get("code"), "authorization-code");
+  assert.equal(
+    calls[0].url.searchParams.get("redirect_uri"),
+    service.callbackUrl("meta"),
+  );
+  assert.equal(
+    calls[1].url.pathname,
+    "/v99.0/me/assigned_instagram_accounts",
+  );
+  assert.equal(calls[1].url.searchParams.get("fields"), "id,username");
   assert.equal(
     new TokenVault(config.tokenEncryptionKey).decrypt(
       repository.connections[0].encryptedAccessToken,
     ),
-    "long-lived-instagram-token",
+    "system-user-access-token",
   );
+  assert.equal(repository.connections[0].tokenType, "system_user");
+  assert.equal(repository.connections[0].loginConfigId, "login-config-id");
   assert.deepEqual(repository.connections[0].scopes, [
-    "instagram_business_basic",
-    "instagram_business_content_publish",
+    "instagram_basic",
+    "instagram_content_publish",
   ]);
+  assert.ok(
+    calls.every(({ url }) => url.origin === "https://graph.facebook.com"),
+  );
+  const listed = await service.listConnections();
+  assert.deepEqual(listed.map((item) => item.platform), ["instagram"]);
+  assert.equal(JSON.stringify(listed).includes("system-user-access-token"), false);
+});
+
+test("Login for Business callback does not save a token when no Instagram account is assigned", async () => {
+  const repository = new OAuthMemoryRepository();
+  const service = new OAuthService({
+    config: createConfig(),
+    repository,
+    fetchImpl: async (url) => {
+      const requestUrl = new URL(url);
+      if (requestUrl.pathname.endsWith("/oauth/access_token")) {
+        return Response.json({ access_token: "system-user-access-token" });
+      }
+      return Response.json({ data: [] });
+    },
+  });
+  const state = "n".repeat(43);
+  await repository.createOAuthState({
+    state,
+    provider: "meta",
+    expiresAt: new Date(Date.now() + 60_000),
+  });
+
+  await assert.rejects(
+    service.handleCallback("meta", { state, code: "authorization-code" }),
+    /no assigned Instagram accounts/,
+  );
+  assert.equal(repository.connections.length, 0);
 });
 
 test("token vault encrypts tokens and detects tampering", () => {
@@ -281,15 +256,17 @@ test("configuration requires strong admin and encryption keys and a valid public
     ADMIN_API_TOKEN: "a-secure-test-token-with-at-least-32-characters",
     TOKEN_ENCRYPTION_KEY: randomBytes(32).toString("base64"),
     PUBLIC_BASE_URL: "https://reel.example.test",
+    META_LOGIN_CONFIG_ID: "login-config-id",
+    META_REDIRECT_URI: "https://reel.example.test/oauth/meta/callback",
   };
   assert.equal(loadConfig(base).publicBaseUrl, "https://reel.example.test");
   assert.equal(
     loadConfig({ ...base, META_GRAPH_API_VERSION: "v19.0" }).metaGraphApiVersion,
-    "v27.0",
+    "v19.0",
   );
   assert.equal(
-    loadConfig({ ...base, META_GRAPH_API_VERSION: "v27.0" }).metaGraphApiVersion,
-    "v27.0",
+    loadConfig({ ...base, META_GRAPH_API_VERSION: "v26.0" }).metaGraphApiVersion,
+    "v26.0",
   );
   assert.equal(
     loadConfig({
@@ -300,15 +277,20 @@ test("configuration requires strong admin and encryption keys and a valid public
     }).publicBaseUrl,
     "https://reel-production.up.railway.app",
   );
-  assert.equal(loadConfig(base).metaGraphApiVersion, "v27.0");
-  assert.equal(loadConfig(base).metaOAuthMode, "facebook_login");
+  assert.equal(loadConfig(base).metaGraphApiVersion, "v26.0");
+  assert.equal(loadConfig(base).metaOAuthMode, "facebook_login_business");
+  assert.equal(loadConfig(base).metaLoginConfigId, "login-config-id");
   assert.equal(
-    loadConfig({ ...base, META_OAUTH_MODE: "facebook_login" }).metaOAuthMode,
-    "facebook_login",
+    loadConfig(base).metaRedirectUri,
+    "https://reel.example.test/oauth/meta/callback",
   );
   assert.throws(
-    () => loadConfig({ ...base, META_OAUTH_MODE: "unified" }),
+    () => loadConfig({ ...base, META_OAUTH_MODE: "instagram_login" }),
     /META_OAUTH_MODE/,
+  );
+  assert.throws(
+    () => loadConfig({ ...base, META_LOGIN_CONFIG_ID: "" }),
+    /META_LOGIN_CONFIG_ID is required/,
   );
   assert.equal(loadConfig(base).supabaseMediaBucket, "autoreel-publishing");
   assert.equal(
