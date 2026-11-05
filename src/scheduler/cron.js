@@ -1,4 +1,3 @@
-import scheduleJob from "cron";
 import { PublishingEngine } from "../publishing/engine.js";
 import { RetryEngine } from "../retry/engine.js";
 
@@ -21,6 +20,7 @@ export class CronScheduler {
     this.now = now;
 
     this.cronJob = null;
+    this.cronTimeout = null;
     this.running = false;
   }
 
@@ -35,9 +35,25 @@ export class CronScheduler {
     }
 
     const interval = this.scheduleExpression;
-    this.cronJob = scheduleJob(interval, async () => {
-      await this.runScheduledPublishing();
-    });
+    // The configured expression currently defaults to the top of each hour.
+    // Use native timers so production does not depend on an undeclared package.
+    if (interval !== "0 * * * *") {
+      throw new Error(`Unsupported cron schedule: ${interval}`);
+    }
+    const runAtNextHour = () => {
+      const now = this.now();
+      const nextHour = new Date(now);
+      nextHour.setMinutes(0, 0, 0);
+      nextHour.setHours(nextHour.getHours() + 1);
+      this.cronTimeout = setTimeout(async () => {
+        try {
+          await this.runScheduledPublishing();
+        } finally {
+          if (this.running) runAtNextHour();
+        }
+      }, Math.max(1, nextHour.getTime() - now.getTime()));
+    };
+    runAtNextHour();
 
     this.running = true;
     return { started: true, schedule: interval };
@@ -48,9 +64,9 @@ export class CronScheduler {
       return { stopped: false, reason: "Not running" };
     }
 
-    this.cronJob.stop();
-    this.cronJob = null;
     this.running = false;
+    clearTimeout(this.cronTimeout);
+    this.cronTimeout = null;
 
     return { stopped: true };
   }
