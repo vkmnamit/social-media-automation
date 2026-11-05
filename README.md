@@ -1,10 +1,10 @@
-# AutoReel Engine
+# Social Video Publishing Backend
 
-A Node.js service for authorized video uploads, FFmpeg vertical-video
-processing, official account authorization, publishing, and local storage
-cleanup. **Supabase Postgres** stores asset, publishing, and encrypted OAuth
-metadata; video files remain in the configured local or persistent-volume
-storage directory.
+A backend-only Node.js service for authorized video uploads, FFmpeg
+vertical-video processing, official account authorization, publishing, and
+local storage cleanup. It does not provide a web dashboard. **Supabase
+Postgres** stores asset, publishing, and encrypted OAuth metadata; video files
+remain in the configured local or persistent-volume storage directory.
 
 ## Set up Supabase
 
@@ -39,8 +39,8 @@ or direct Postgres connection string is required.
    `TOKEN_ENCRYPTION_KEY`.
 4. Set `PUBLIC_BASE_URL=http://localhost:3000` for local development.
 5. Install dependencies with `npm install`.
-6. Start with `npm start`, open `http://localhost:3000`, and enter the admin
-   token.
+6. Start the API with `npm start`. The service exposes `/health`; all `/api/*`
+   routes require `Authorization: Bearer <ADMIN_API_TOKEN>`.
 7. Run tests with `npm test`.
 
 At startup the app checks that the Supabase schema exists and gives the SQL
@@ -49,20 +49,19 @@ on the configured interval.
 
 ## Current workflow
 
-- Upload authorized MP4, MOV, WebM, or MKV videos.
-- Add captions and hashtags, then process videos into 9:16 H.264/AAC MP4.
-- Preview the source or processed video in the dashboard and see confirmed
-  publishing status and post links when available.
-- Choose **Publish to Instagram** on a processed video to send a real Reel.
-  AutoReel copies the processed file to a private Supabase Storage bucket,
-  gives Meta a temporary signed URL, waits for Meta's processing status, and
-  only then publishes. The temporary cloud copy is removed after the attempt;
-  the local video remains for the configured retention period.
-- Connect Instagram/Facebook and YouTube with official OAuth flows. Tokens are
-  encrypted before being saved; account listings do not expose tokens.
-- Schedule and publish to connected accounts through the official platform
-  APIs.
-- Track local storage usage and apply cleanup and recovery rules.
+- Use `POST /api/assets` to upload an authorized MP4, MOV, WebM, or MKV video.
+- Use `PATCH /api/assets/{id}` to set its caption, hashtags, and target
+  platform, then `POST /api/assets/{id}/process` to create a 9:16 H.264/AAC MP4.
+- Use `GET /api/assets` to inspect processing and publishing status and
+  `GET /api/assets/{id}/video` to retrieve a local video.
+- Start official account authorization with `POST /api/oauth/meta/start` or
+  `POST /api/oauth/google/start`. The callback returns JSON; tokens are
+  encrypted before being saved, and account listings do not expose tokens.
+- Publish a processed video through `POST /api/assets/{id}/publish`. Instagram
+  publishing uses a temporary signed Supabase Storage URL and waits for Meta
+  to confirm publication before saving the post ID and URL.
+- Use `GET /api/storage` to inspect local storage usage. Cleanup and recovery
+  run in the background according to the configured retention rules.
 
 Only publish videos you own or are licensed to distribute. The app does not
 scrape other creators' posts or use login cookies.

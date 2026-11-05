@@ -32,7 +32,7 @@ class TestRepository {
   }
 }
 
-test("dashboard is public while API requires its bearer token", async (t) => {
+test("service has no dashboard and API requires its bearer token", async (t) => {
   const root = await mkdtemp(path.join(os.tmpdir(), "autoreel-server-"));
   const repository = new TestRepository();
   const config = {
@@ -68,9 +68,9 @@ test("dashboard is public while API requires its bearer token", async (t) => {
   });
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
 
-  const dashboard = await fetch(baseUrl);
-  assert.equal(dashboard.status, 200);
-  assert.match(await dashboard.text(), /AutoReel Studio/);
+  const rootResponse = await fetch(baseUrl);
+  assert.equal(rootResponse.status, 404);
+  assert.deepEqual(await rootResponse.json(), { error: "Not found" });
 
   const unauthorized = await fetch(`${baseUrl}/api/assets`);
   assert.equal(unauthorized.status, 401);
@@ -374,7 +374,7 @@ test("upload endpoint rejects non-video formats and oversized content", async (t
   assert.equal(oversized.status, 413);
 });
 
-test("OAuth initiation requires admin auth and callback returns without token data", async (t) => {
+test("OAuth initiation requires admin auth and callback returns backend JSON without token data", async (t) => {
   const root = await mkdtemp(path.join(os.tmpdir(), "autoreel-oauth-routes-"));
   const config = {
     adminApiToken: "a-secure-test-token-with-at-least-32-characters",
@@ -431,11 +431,7 @@ test("OAuth initiation requires admin auth and callback returns without token da
 
   const callback = await fetch(
     `${baseUrl}/oauth/google/callback?state=state-value&code=code-value`,
-    { redirect: "manual" },
   );
-  assert.equal(callback.status, 303);
-  assert.equal(
-    callback.headers.get("location"),
-    "https://reel.example.test/?connected=google&accounts=1",
-  );
+  assert.equal(callback.status, 200);
+  assert.deepEqual(await callback.json(), { connected: "google", accounts: 1 });
 });

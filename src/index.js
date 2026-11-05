@@ -86,7 +86,7 @@ process.once("SIGINT", () => void shutdown("SIGINT"));
 process.once("SIGTERM", () => void shutdown("SIGTERM"));
 
 server.listen(config.port, "0.0.0.0", () => {
-  console.info(`AutoReel Studio listening on port ${config.port}`);
+  console.info(`Backend API listening on port ${config.port}`);
 });
 await runCleanup();
 cleanupTimer = setInterval(runCleanup, config.cleanupIntervalMs);

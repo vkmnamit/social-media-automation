@@ -1,6 +1,6 @@
 import { randomUUID, timingSafeEqual } from "node:crypto";
 import { createReadStream, createWriteStream } from "node:fs";
-import { mkdir, readFile, rename, rm } from "node:fs/promises";
+import { mkdir, rename, rm } from "node:fs/promises";
 import http from "node:http";
 import path from "node:path";
 import { Transform } from "node:stream";
@@ -136,25 +136,10 @@ export function createApiServer({
         return sendJson(response, 200, { status: "ok" });
       }
 
-      if (url.pathname === "/" && request.method === "GET") {
-        const page = await readFile(new URL("../public/index.html", import.meta.url));
-        response.writeHead(200, {
-          "content-type": "text/html; charset=utf-8",
-          "cache-control": "no-store",
-          "content-security-policy": "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
-          "x-content-type-options": "nosniff",
-          "referrer-policy": "no-referrer",
-        });
-        response.end(page);
-        return;
-      }
-
       const callbackRoute = url.pathname.match(/^\/oauth\/(meta|google)\/callback$/);
       if (request.method === "GET" && callbackRoute) {
         if (!oauthService) {
-          response.writeHead(303, { location: "/?oauth_error=unavailable" });
-          response.end();
-          return;
+          return sendJson(response, 503, { error: "OAuth is not configured" });
         }
         try {
           const connections = await oauthService.handleCallback(
@@ -167,30 +152,17 @@ export function createApiServer({
                 url.searchParams.get("error_reason"),
             },
           );
-          const redirect = new URL("/", config.publicBaseUrl);
-          redirect.searchParams.set("connected", callbackRoute[1]);
-          redirect.searchParams.set("accounts", String(connections.length));
-          response.writeHead(303, {
-            location: redirect.toString(),
-            "cache-control": "no-store",
-            "referrer-policy": "no-referrer",
+          return sendJson(response, 200, {
+            connected: callbackRoute[1],
+            accounts: connections.length,
           });
-          response.end();
         } catch (error) {
           logger.error?.("OAuth callback failed", {
             provider: callbackRoute[1],
             errorName: error.name,
           });
-          const redirect = new URL("/", config.publicBaseUrl);
-          redirect.searchParams.set("oauth_error", "connection_failed");
-          response.writeHead(303, {
-            location: redirect.toString(),
-            "cache-control": "no-store",
-            "referrer-policy": "no-referrer",
-          });
-          response.end();
+          return sendJson(response, 400, { error: "OAuth connection failed" });
         }
-        return;
       }
 
       if (!url.pathname.startsWith("/api/")) {
@@ -567,7 +539,7 @@ export function createApiServer({
             error,
           });
           return sendJson(response, 503, {
-            error: "Instagram confirmed the Reel, but AutoReel could not save its status. Check Instagram before trying again.",
+            error: "Instagram confirmed the Reel, but the service could not save its status. Check Instagram before trying again.",
           });
         }
 
