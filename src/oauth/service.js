@@ -3,12 +3,16 @@ import { OAuth2Client } from "google-auth-library";
 import { TokenVault } from "./token-vault.js";
 
 const STATE_TTL_MS = 10 * 60 * 1000;
-const META_SCOPES = [
+const FACEBOOK_LOGIN_SCOPES = [
   "pages_show_list",
   "pages_read_engagement",
   "pages_manage_posts",
   "instagram_basic",
   "instagram_content_publish",
+];
+const INSTAGRAM_LOGIN_SCOPES = [
+  "instagram_business_basic",
+  "instagram_business_content_publish",
 ];
 const GOOGLE_SCOPES = [
   "openid",
@@ -84,6 +88,19 @@ export class OAuthService {
     });
 
     if (provider === "meta") {
+      if (this.config.metaOAuthMode === "instagram_login") {
+        const authorizeUrl = new URL("https://www.instagram.com/oauth/authorize");
+        authorizeUrl.search = new URLSearchParams({
+          client_id: this.config.metaAppId,
+          redirect_uri: this.callbackUrl(provider),
+          response_type: "code",
+          scope: INSTAGRAM_LOGIN_SCOPES.join(","),
+          state,
+          enable_fb_login: "false",
+        }).toString();
+        return authorizeUrl.toString();
+      }
+
       const authorizeUrl = new URL(
         `https://www.facebook.com/${this.config.metaGraphApiVersion}/dialog/oauth`,
       );
@@ -92,7 +109,7 @@ export class OAuthService {
         redirect_uri: this.callbackUrl(provider),
         response_type: "code",
         state,
-        scope: META_SCOPES.join(","),
+        scope: FACEBOOK_LOGIN_SCOPES.join(","),
       }).toString();
       return authorizeUrl.toString();
     }
@@ -142,6 +159,10 @@ export class OAuthService {
   }
 
   async finishMetaAuthorization(code) {
+    if (this.config.metaOAuthMode === "instagram_login") {
+      return this.finishInstagramLoginAuthorization(code);
+    }
+
     const base = `https://graph.facebook.com/${this.config.metaGraphApiVersion}`;
     const redirectUri = this.callbackUrl("meta");
     const shortTokenUrl = new URL(`${base}/oauth/access_token`);
@@ -177,7 +198,7 @@ export class OAuthService {
     const granted = (permissions.data || [])
       .filter((permission) => permission.status === "granted")
       .map((permission) => permission.permission);
-    assertScopes(granted, META_SCOPES);
+    assertScopes(granted, FACEBOOK_LOGIN_SCOPES);
 
     const pagesUrl = new URL(`${base}/me/accounts`);
     pagesUrl.search = new URLSearchParams({
@@ -226,6 +247,80 @@ export class OAuthService {
       accountId,
       displayName,
     }));
+  }
+
+  async finishInstagramLoginAuthorization(code) {
+    const redirectUri = this.callbackUrl("meta");
+    const shortToken = await safeResponse(
+      await this.fetch("https://api.instagram.com/oauth/access_token", {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          client_id: this.config.metaAppId,
+          client_secret: this.config.metaAppSecret,
+          grant_type: "authorization_code",
+          redirect_uri: redirectUri,
+          code,
+        }),
+      }),
+      "Instagram code exchange",
+    );
+    if (typeof shortToken.access_token !== "string" || !shortToken.access_token) {
+      throw new Error("Instagram did not return an access token");
+    }
+
+    const longTokenUrl = new URL(
+      "https://graph.instagram.com/access_token",
+    );
+    longTokenUrl.search = new URLSearchParams({
+      grant_type: "ig_exchange_token",
+      client_secret: this.config.metaAppSecret,
+      access_token: shortToken.access_token,
+    }).toString();
+    const longToken = await safeResponse(
+      await this.fetch(longTokenUrl),
+      "Instagram long-lived token exchange",
+    );
+    if (typeof longToken.access_token !== "string" || !longToken.access_token) {
+      throw new Error("Instagram did not return a long-lived access token");
+    }
+
+    const accountUrl = new URL(
+      `https://graph.instagram.com/${this.config.metaGraphApiVersion}/me`,
+    );
+    accountUrl.search = new URLSearchParams({
+      fields: "user_id,username",
+      access_token: longToken.access_token,
+    }).toString();
+    const account = await safeResponse(
+      await this.fetch(accountUrl),
+      "Instagram account lookup",
+    );
+    const accountId = account.user_id || account.id;
+    if (typeof accountId !== "string" || !accountId) {
+      throw new Error("Instagram did not return a professional account ID");
+    }
+
+    const connection = {
+      connectionId: randomUUID(),
+      provider: "meta",
+      platform: "instagram",
+      accountId,
+      displayName: account.username || accountId,
+      scopes: INSTAGRAM_LOGIN_SCOPES,
+      encryptedAccessToken: this.vault.encrypt(longToken.access_token),
+      tokenExpiresAt:
+        Number.isFinite(longToken.expires_in) && longToken.expires_in > 0
+          ? new Date(this.now().getTime() + longToken.expires_in * 1000)
+          : null,
+      connectedAt: this.now(),
+    };
+    await this.repository.saveOAuthConnections([connection]);
+    return [{
+      platform: connection.platform,
+      accountId: connection.accountId,
+      displayName: connection.displayName,
+    }];
   }
 
   async finishGoogleAuthorization(code) {

@@ -52,7 +52,8 @@ test("Instagram publishing uploads a private copy, waits for processing, and pub
   const config = {
     storageDir: root,
     supabaseMediaBucket: "private-reels",
-    metaGraphApiVersion: "v26.0",
+    metaOAuthMode: "instagram_login",
+    metaGraphApiVersion: "v27.0",
     tokenEncryptionKey: randomBytes(32),
   };
   const accessToken = "page-access-token";
@@ -92,6 +93,10 @@ test("Instagram publishing uploads a private copy, waits for processing, and pub
     wait: async () => {},
     logger: { warn() {}, error() {} },
   });
+  assert.deepEqual(publisher.requiredScopes, [
+    "instagram_business_basic",
+    "instagram_business_content_publish",
+  ]);
 
   const result = await publisher.publishToPlatform(
     {
@@ -113,8 +118,8 @@ test("Instagram publishing uploads a private copy, waits for processing, and pub
   assert.equal(result.verified, true);
   assert.equal(result.postUrl, "https://www.instagram.com/reel/published-media-1/");
   assert.equal(requests.length, 4);
-  assert.ok(requests.every(({ url }) => url.origin === "https://graph.facebook.com"));
-  assert.ok(requests.every(({ url }) => url.pathname.includes("/v26.0/")));
+  assert.ok(requests.every(({ url }) => url.origin === "https://graph.instagram.com"));
+  assert.ok(requests.every(({ url }) => url.pathname.includes("/v27.0/")));
   assert.deepEqual(removals, [[uploads[0].objectPath]]);
 });
 

@@ -82,14 +82,18 @@ export function loadConfig(env = process.env) {
   ) {
     throw new Error("PUBLIC_BASE_URL must use HTTPS except for localhost");
   }
-  const configuredMetaGraphApiVersion = env.META_GRAPH_API_VERSION || "v26.0";
+  const configuredMetaOAuthMode = env.META_OAUTH_MODE || "facebook_login";
+  if (!["instagram_login", "facebook_login"].includes(configuredMetaOAuthMode)) {
+    throw new Error("META_OAUTH_MODE must be instagram_login or facebook_login");
+  }
+  const configuredMetaGraphApiVersion = env.META_GRAPH_API_VERSION || "v27.0";
   const graphVersionMatch = configuredMetaGraphApiVersion.match(/^v(\d+)\.\d+$/);
   if (!graphVersionMatch) {
     throw new Error("META_GRAPH_API_VERSION must look like vNN.N");
   }
   const metaGraphApiVersion =
-    Number(graphVersionMatch[1]) < 26
-      ? "v26.0"
+    Number(graphVersionMatch[1]) < 27
+      ? "v27.0"
       : configuredMetaGraphApiVersion;
 
   const maxStorageGb = positiveNumber(env, "MAX_STORAGE_GB", 10);
@@ -122,6 +126,7 @@ export function loadConfig(env = process.env) {
     publicBaseUrl: publicBaseUrl.origin,
     metaAppId: env.META_APP_ID || "",
     metaAppSecret: env.META_APP_SECRET || "",
+    metaOAuthMode: configuredMetaOAuthMode,
     metaGraphApiVersion,
     googleClientId: env.GOOGLE_CLIENT_ID || "",
     googleClientSecret: env.GOOGLE_CLIENT_SECRET || "",

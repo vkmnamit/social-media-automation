@@ -51,6 +51,12 @@ export class InstagramPublisher extends PlatformPublisher {
   }
 
   get requiredScopes() {
+    if (this.config.metaOAuthMode === "instagram_login") {
+      return [
+        "instagram_business_basic",
+        "instagram_business_content_publish",
+      ];
+    }
     return [
       "instagram_basic",
       "instagram_content_publish",
@@ -203,7 +209,11 @@ export class InstagramPublisher extends PlatformPublisher {
     const { accessToken, instagramUserId } = await this.resolveCredentials(
       asset.connection,
     );
-    const graphBase = `https://graph.facebook.com/${this.config.metaGraphApiVersion}`;
+    const graphHost =
+      this.config.metaOAuthMode === "instagram_login"
+        ? "graph.instagram.com"
+        : "graph.facebook.com";
+    const graphBase = `https://${graphHost}/${this.config.metaGraphApiVersion}`;
     const caption = post?.caption ?? asset.caption ?? "";
     const hashtagString = post?.hashtagString ?? (asset.hashtags || []).join(" ");
     const finalCaption = [caption.trim(), hashtagString.trim()]
