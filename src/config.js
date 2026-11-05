@@ -82,13 +82,9 @@ export function loadConfig(env = process.env) {
   ) {
     throw new Error("PUBLIC_BASE_URL must use HTTPS except for localhost");
   }
-  const configuredMetaOAuthMode =
-    env.META_OAUTH_MODE || "facebook_login_business";
-  if (configuredMetaOAuthMode !== "facebook_login_business") {
-    throw new Error(
-      "META_OAUTH_MODE must be facebook_login_business",
-    );
-  }
+  // The configured Meta Login for Business flow is authoritative. Ignore a
+  // stale legacy META_OAUTH_MODE variable so it cannot crash production boot.
+  const configuredMetaOAuthMode = "facebook_login_business";
   const configuredMetaGraphApiVersion = env.META_GRAPH_API_VERSION || "v26.0";
   const graphVersionMatch = configuredMetaGraphApiVersion.match(/^v\d+\.\d+$/);
   if (!graphVersionMatch) {

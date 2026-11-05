@@ -284,9 +284,9 @@ test("configuration requires strong admin and encryption keys and a valid public
     loadConfig(base).metaRedirectUri,
     "https://reel.example.test/oauth/meta/callback",
   );
-  assert.throws(
-    () => loadConfig({ ...base, META_OAUTH_MODE: "instagram_login" }),
-    /META_OAUTH_MODE/,
+  assert.equal(
+    loadConfig({ ...base, META_OAUTH_MODE: "instagram_login" }).metaOAuthMode,
+    "facebook_login_business",
   );
   assert.throws(
     () => loadConfig({ ...base, META_LOGIN_CONFIG_ID: "" }),
