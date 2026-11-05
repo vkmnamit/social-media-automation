@@ -30,7 +30,8 @@ or direct Postgres connection string is required.
 ## Configure and run
 
 1. Use Node.js 22 or newer, FFmpeg, and FFprobe. Supabase JS requires Node 22
-   for its native WebSocket runtime.
+   for its native WebSocket runtime. Railway uses the included `Dockerfile`,
+   which installs FFmpeg and FFprobe in the production image.
 2. Copy `.env.example` to `.env`; configure the Supabase URL and service-role
    key as described above.
 3. Generate an admin token with `openssl rand -hex 32` and an encryption key
