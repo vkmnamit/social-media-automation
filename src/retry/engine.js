@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { MongoAssetRepository } from "../storage/mongo-repository.js";
 import { PublishingError } from "../publishing/engine.js";
 import { ExponentialBackoff, retryWithBackoff } from "../util/retry.js";
 
@@ -52,8 +51,6 @@ export class RetryEngine {
         hashtagString: result.hashtagString,
         publishedAt: result.publishedAt,
       }, result.publishedAt);
-
-      await this.repository.cleanupLocalFiles(_id);
 
       return {
         assetId: _id,

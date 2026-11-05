@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import { deleteLocalFile, getStorageUsage } from "../src/storage/local-files.js";
 import { StorageLimitError, StorageManager } from "../src/storage/manager.js";
-import { MongoAssetRepository } from "../src/storage/mongo-repository.js";
+import { SupabaseAssetRepository } from "../src/storage/supabase-repository.js";
 
 class MemoryRepository {
   constructor(assets) {
@@ -188,21 +188,20 @@ test("local deletion rejects traversal and does not follow directory symlinks", 
 
 test("recovery assets can transition back to publishing for retry", async () => {
   let update;
-  const repository = new MongoAssetRepository({
-    collection() {
-      return {
-        async updateOne(filter, changes) {
-          update = { filter, changes };
-          return { modifiedCount: 1 };
-        },
-      };
+  const repository = new SupabaseAssetRepository({
+    async rpc(name, args) {
+      update = { name, args };
+      return { data: true, error: null };
     },
   });
 
   assert.equal(await repository.startPublishing("recovered-asset"), true);
-  assert.deepEqual(update.filter, {
-    _id: "recovered-asset",
-    status: { $in: ["processed", "upload_failed", "recovery"] },
-  });
-  assert.equal(update.changes.$unset.recoveryQueuedAt, "");
+  assert.equal(update.name, "autoreel_patch_asset");
+  assert.equal(update.args.p_id, "recovered-asset");
+  assert.deepEqual(update.args.p_expected_statuses, [
+    "processed",
+    "upload_failed",
+    "recovery",
+  ]);
+  assert.equal(update.args.p_patch.recoveryQueuedAt, null);
 });

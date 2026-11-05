@@ -1,4 +1,4 @@
-import { lstat, mkdir, readdir, realpath, unlink } from "node:fs/promises";
+import { lstat, mkdir, readdir, realpath, stat, unlink } from "node:fs/promises";
 import path from "node:path";
 
 function isWithin(parent, candidate) {
@@ -54,6 +54,20 @@ export async function deleteLocalFile(storageDir, relativePath) {
       throw error;
     }
   }
+}
+
+export async function getLocalFile(storageDir, relativePath) {
+  const target = await resolveManagedFile(storageDir, relativePath);
+  const root = await getRoot(storageDir);
+  const details = await lstat(target);
+  if (!details.isFile()) {
+    throw new Error("Asset is not a regular local video file");
+  }
+  const parent = await realpath(path.dirname(target));
+  if (parent !== root && !isWithin(root, parent)) {
+    throw new Error("Asset path resolves outside the configured storage directory");
+  }
+  return { path: target, size: (await stat(target)).size };
 }
 
 export async function getStorageUsage(storageDir) {

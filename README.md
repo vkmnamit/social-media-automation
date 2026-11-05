@@ -1,106 +1,103 @@
 # AutoReel Engine
 
-A Node.js service for the first AutoReel workflow slice: a protected dashboard,
-authorized video upload, MongoDB library, FFmpeg vertical-video processing, and
-local storage cleanup. MongoDB stores asset and publishing metadata; video files
-remain in a configured storage directory.
+A Node.js service for authorized video uploads, FFmpeg vertical-video
+processing, official account authorization, publishing, and local storage
+cleanup. **Supabase Postgres** stores asset, publishing, and encrypted OAuth
+metadata; video files remain in the configured local or persistent-volume
+storage directory.
+
+## Set up Supabase
+
+1. Create a Supabase project, or use the project already configured for this
+   app.
+2. In the Supabase Dashboard, open **SQL Editor**, paste the contents of
+   [`supabase/schema.sql`](./supabase/schema.sql), and run it. This creates the
+   private tables and atomic lifecycle functions required by the app.
+3. In **Project Settings → API**, copy the project URL and the server-side
+   `service_role` key. Do not use the public anon key for this backend.
+4. Put them in `.env` as `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`. The
+   app also recognizes the existing lowercase variables `supabase_url` and
+   `supabase_service_role_key`.
+
+The service-role key bypasses Row Level Security. It is only read by the
+server, never sent to the browser. The migration enables RLS, revokes table
+access from `anon` and `authenticated`, and grants access to `service_role`.
+Never commit `.env` or expose the service-role key.
+
+The app uses Supabase's PostgREST API over HTTPS; no separate MongoDB database
+or direct Postgres connection string is required.
+
+## Configure and run
+
+1. Use Node.js 20 or newer, FFmpeg, and FFprobe.
+2. Copy `.env.example` to `.env`; configure the Supabase URL and service-role
+   key as described above.
+3. Generate an admin token with `openssl rand -hex 32` and an encryption key
+   with `openssl rand -base64 32`; set `ADMIN_API_TOKEN` and
+   `TOKEN_ENCRYPTION_KEY`.
+4. Set `PUBLIC_BASE_URL=http://localhost:3000` for local development.
+5. Install dependencies with `npm install`.
+6. Start with `npm start`, open `http://localhost:3000`, and enter the admin
+   token.
+7. Run tests with `npm test`.
+
+At startup the app checks that the Supabase schema exists and gives the SQL
+migration instructions if tables are missing. Cleanup runs at startup and then
+on the configured interval.
 
 ## Current workflow
 
-- Upload authorized MP4, MOV, WebM, or MKV files from the dashboard.
-- Add captions and hashtags, then process the upload into a 9:16 H.264/AAC MP4.
-- Review the library and see storage usage. The private API requires a bearer
-  token; the browser keeps it in session storage.
-- The worker cleans up files according to the retention settings below.
+- Upload authorized MP4, MOV, WebM, or MKV videos.
+- Add captions and hashtags, then process videos into 9:16 H.264/AAC MP4.
+- Preview the source or processed video in the dashboard and see confirmed
+  publishing status and post links when available.
+- Choose **Publish to Instagram** on a processed video to send a real Reel.
+  AutoReel copies the processed file to a private Supabase Storage bucket,
+  gives Meta a temporary signed URL, waits for Meta's processing status, and
+  only then publishes. The temporary cloud copy is removed after the attempt;
+  the local video remains for the configured retention period.
+- Connect Instagram/Facebook and YouTube with official OAuth flows. Tokens are
+  encrypted before being saved; account listings do not expose tokens.
+- Schedule and publish to connected accounts through the official platform
+  APIs.
+- Track local storage usage and apply cleanup and recovery rules.
 
-Official account connection is implemented, but publishing/scheduling is not
-connected yet. Instagram, Facebook, and YouTube require developer-app setup,
-account permissions, and platform-specific upload workflows. The app does not
-simulate successful publishing or delete platform posts.
+Only publish videos you own or are licensed to distribute. The app does not
+scrape other creators' posts or use login cookies.
 
-The official account-connection flow is available when its provider app
-credentials are configured. It never requests platform passwords or stores
-browser cookies; OAuth state is one-time and tokens are encrypted before being
-stored in MongoDB. Configure `TOKEN_ENCRYPTION_KEY` with
-`openssl rand -base64 32` and set `PUBLIC_BASE_URL` to the exact HTTPS service
-origin used by your provider callback configuration. Register these callback
-URLs in your developer apps:
+## Cleanup and retention
+
+- Temporary assets are eligible for cleanup 2 hours after processing.
+- Original and edited videos are retained for 24 hours after successful
+  publication.
+- Failed uploads are kept for 48 hours and then queued for recovery, not
+  automatically deleted.
+- Captions, hashtags, platform post IDs, and URLs remain in Supabase after local
+  files are removed.
+- Cleanup deletes local files only; it does not delete published posts.
+- Storage quota reservations account for concurrent uploads and processing.
+
+Configure these values in `.env`: `MAX_STORAGE_GB`, `MAX_UPLOAD_MB`,
+`MAX_TRANSCODE_MB`, `TEMP_RETENTION_HOURS`, `PUBLISHED_RETENTION_HOURS`,
+`FAILED_RETENTION_HOURS`, and `CLEANUP_INTERVAL_MINUTES`.
+
+## Platform OAuth and deployment
+
+For Instagram OAuth/publishing, configure `META_APP_ID`, `META_APP_SECRET`,
+and `META_GRAPH_API_VERSION` (defaults to `v26.0`). `SUPABASE_MEDIA_BUCKET`
+defaults to the private `autoreel-publishing` bucket, which the server creates
+when needed using its service-role key. Configure `GOOGLE_CLIENT_ID` and
+`GOOGLE_CLIENT_SECRET` only if YouTube is needed.
+Generate `TOKEN_ENCRYPTION_KEY` with `openssl rand -base64 32` and use the exact
+HTTPS service origin for `PUBLIC_BASE_URL` in production.
+
+Register these callback URLs with the provider apps:
 
 - `${PUBLIC_BASE_URL}/oauth/meta/callback`
 - `${PUBLIC_BASE_URL}/oauth/google/callback`
 
-Set `META_APP_ID`, `META_APP_SECRET`, and `META_GRAPH_API_VERSION` from your
-Meta developer app; enable the Facebook Login and Instagram Graph API products.
-The Meta flow requests Page publishing and Instagram professional-account
-permissions and lists Pages available to the authorizing user. Instagram
-publishing requires a linked professional account.
-
-Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` from a Google OAuth web
-client, enable YouTube Data API v3, and add its redirect URL. The YouTube flow
-requests channel read and video upload access. OAuth consent-screen testing
-requires the account to be listed as a test user.
-
-After setting `.env`, restart the service, connect the dashboard with the admin
-API token, and use **Connect Instagram / Facebook** or **Connect YouTube**.
-Connected account names and IDs are stored separately from encrypted provider
-tokens. Developer-app verification or review may be required before publishing
-to accounts outside the app's test users. The OAuth flow only connects
-accounts—it does not publish videos yet.
-
-## Cleanup behavior
-
-- Temporary assets explicitly registered with `kind: "temporary"` are eligible
-  for cleanup 2 hours after processing.
-- Original and edited files are eligible 24 hours after a confirmed successful
-  publish. Call `markPublished` only after the platform confirms publication.
-- Failed uploads are retained for 48 hours, then moved to the MongoDB recovery
-  queue. Their local files are not automatically deleted.
-- Captions, hashtags, platform post IDs, and URLs remain in MongoDB after a
-  local file is cleaned up.
-- Cleanup only removes files under `STORAGE_DIR`; it never calls platform
-  deletion APIs.
-- Reserve space with `reserveCapacity(bytes)` before writing/importing. Release
-  the reservation only after the file exists on disk (or if the write fails);
-  this prevents concurrent imports from oversubscribing the configured limit.
-  When capacity is insufficient, it raises `StorageLimitError` rather than
-  deleting a video that is still needed for retry or recovery.
-
-The defaults are configurable with `TEMP_RETENTION_HOURS`,
-`PUBLISHED_RETENTION_HOURS`, `FAILED_RETENTION_HOURS`, `MAX_STORAGE_GB`, and
-`CLEANUP_INTERVAL_MINUTES`.
-
-## Run locally
-
-1. Use Node.js 20 or newer, MongoDB, FFmpeg, and FFprobe.
-2. Copy `.env.example` to `.env` and set `MONGODB_URI`.
-3. Generate an admin token with `openssl rand -hex 32` and an encryption key
-   with `openssl rand -base64 32`; set `ADMIN_API_TOKEN` and
-   `TOKEN_ENCRYPTION_KEY` in `.env`.
-4. Set `PUBLIC_BASE_URL=http://localhost:3000` for local development.
-5. Install dependencies with `npm install`.
-6. Start the service with `npm start`.
-7. Open `http://localhost:3000` and enter the admin token.
-8. Run checks with `npm test`.
-
-The service performs a cleanup pass at startup and then repeats on the
-configured interval, logging cleanup results and storage usage. It requires
-MongoDB and FFmpeg/FFprobe to be installed; MongoDB must be reachable at startup.
-
-Upload and processing limits default to 500 MB each and can be changed with
-`MAX_UPLOAD_MB` and `MAX_TRANSCODE_MB`. Processing crops to fill a 1080x1920
-frame; keep original authorized content until a post is confirmed.
-
-## Render / Railway deployment
-
-Deploy this package as a **background worker**, not a web service, and attach a
-persistent volume mounted at `STORAGE_DIR`. Set `MONGODB_URI` to a managed
-MongoDB instance and configure the other environment variables in the provider
-dashboard. Keep one worker per storage volume; the storage limit check assumes a
-single writer. Do not put credentials in the repository.
-
-For publishing, use only videos you own or are licensed to distribute. The app
-supports manual uploads and official account connection; it does not scrape
-social platforms or publish posts yet. Store app credentials in the provider
-dashboard for deployment and keep `TOKEN_ENCRYPTION_KEY` backed up securely:
-losing or rotating it makes stored provider tokens unreadable.
-# social-media-automation
+Deploy as a background worker/web service with a persistent volume mounted at
+`STORAGE_DIR`. Configure all secrets in the hosting provider's environment
+settings. Back up `TOKEN_ENCRYPTION_KEY`; losing or rotating it makes saved
+OAuth tokens unreadable. Supabase project creation and provider app review must
+be completed in their respective dashboards.

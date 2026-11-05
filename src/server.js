@@ -1,5 +1,5 @@
 import { randomUUID, timingSafeEqual } from "node:crypto";
-import { createWriteStream } from "node:fs";
+import { createReadStream, createWriteStream } from "node:fs";
 import { mkdir, readFile, rename, rm } from "node:fs/promises";
 import http from "node:http";
 import path from "node:path";
@@ -7,6 +7,8 @@ import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { StorageLimitError } from "./storage/manager.js";
 import { getAssetFilePath, processVideo } from "./video/processor.js";
+import { getLocalFile } from "./storage/local-files.js";
+import { PlatformPublishError } from "./publishing/engine.js";
 
 const VIDEO_TYPES = new Map([
   ["video/mp4", ".mp4"],
@@ -61,6 +63,7 @@ async function readJson(request, maxBytes = 32 * 1024) {
 }
 
 function serializeAsset(asset) {
+  const publishedPost = asset.publishedPost || asset.posts?.at(-1) || null;
   return {
     id: asset._id,
     kind: asset.kind,
@@ -72,7 +75,11 @@ function serializeAsset(asset) {
     createdAt: asset.createdAt,
     processedAt: asset.processedAt || null,
     durationSeconds: asset.durationSeconds || null,
+    hasLocalVideo: Boolean(asset.localPath),
+    publishedAt: asset.publishedAt || null,
+    postUrl: publishedPost?.postUrl || null,
     failureMessage: asset.failureMessage || null,
+    retryable: asset.retryable ?? null,
   };
 }
 
@@ -200,6 +207,58 @@ export function createApiServer({
 
       if (request.method === "GET" && url.pathname === "/api/storage") {
         return sendJson(response, 200, await storage.getStorageStatus());
+      }
+
+      const videoRoute = url.pathname.match(/^\/api\/assets\/([^/]+)\/video$/);
+      if (request.method === "GET" && videoRoute) {
+        const asset = await repository.getAsset(decodeURIComponent(videoRoute[1]));
+        if (!asset) return sendJson(response, 404, { error: "Video not found" });
+        if (!asset.localPath) {
+          return sendJson(response, 410, { error: "Local video is no longer available" });
+        }
+
+        const file = await getLocalFile(config.storageDir, asset.localPath);
+        const rangeMatch = request.headers.range?.match(/^bytes=(\d*)-(\d*)$/);
+        let start = 0;
+        let end = file.size - 1;
+        if (rangeMatch) {
+          if (rangeMatch[1]) {
+            start = Number(rangeMatch[1]);
+            end = rangeMatch[2] ? Number(rangeMatch[2]) : end;
+          } else if (rangeMatch[2]) {
+            start = Math.max(0, file.size - Number(rangeMatch[2]));
+          }
+
+          if (
+            !Number.isSafeInteger(start) ||
+            !Number.isSafeInteger(end) ||
+            start < 0 ||
+            start >= file.size ||
+            end < start
+          ) {
+            response.writeHead(416, {
+              "content-range": `bytes */${file.size}`,
+              "cache-control": "private, no-store",
+            });
+            response.end();
+            return;
+          }
+          end = Math.min(end, file.size - 1);
+        }
+
+        response.writeHead(rangeMatch ? 206 : 200, {
+          "content-type":
+            asset.kind === "edited" ? "video/mp4" : asset.mimeType || "video/mp4",
+          "content-length": String(end - start + 1),
+          "accept-ranges": "bytes",
+          "cache-control": "private, no-store",
+          "x-content-type-options": "nosniff",
+          ...(rangeMatch
+            ? { "content-range": `bytes ${start}-${end}/${file.size}` }
+            : {}),
+        });
+        createReadStream(file.path, { start, end }).pipe(response);
+        return;
       }
 
       if (request.method === "GET" && url.pathname === "/api/analytics") {
@@ -336,7 +395,38 @@ export function createApiServer({
         return sendJson(response, 201, { asset: serializeAsset(asset) });
       }
 
-      const assetRoute = url.pathname.match(/^\/api\/assets\/([^/]+)(?:\/(process))?$/);
+      const assetRoute = url.pathname.match(
+        /^\/api\/assets\/([^/]+)(?:\/(process|publish|retry))?$/,
+      );
+      if (request.method === "PATCH" && assetRoute && !assetRoute[2]) {
+        const body = await readJson(request);
+        if (!body || typeof body !== "object" || Array.isArray(body)) {
+          return sendJson(response, 400, { error: "Asset metadata must be a JSON object" });
+        }
+        const metadata = validateMetadata(body);
+        if (
+          body.platform !== undefined &&
+          body.platform !== "instagram"
+        ) {
+          return sendJson(response, 400, { error: "Only Instagram publishing is currently supported" });
+        }
+        const updated = await repository.updateMetadata(
+          decodeURIComponent(assetRoute[1]),
+          {
+            ...metadata,
+            ...(body.platform === undefined ? {} : { platform: body.platform }),
+          },
+        );
+        if (!updated) {
+          return sendJson(response, 409, { error: "Video metadata cannot be updated in its current state" });
+        }
+        return sendJson(response, 200, {
+          asset: serializeAsset(
+            await repository.getAsset(decodeURIComponent(assetRoute[1])),
+          ),
+        });
+      }
+
       if (assetRoute && request.method === "POST" && assetRoute[2] === "process") {
         const assetId = decodeURIComponent(assetRoute[1]);
         const asset = await repository.getAsset(assetId);
@@ -388,70 +478,106 @@ export function createApiServer({
 
       if (assetRoute && request.method === "POST" && assetRoute[2] === "publish") {
         const assetId = decodeURIComponent(assetRoute[1]);
+        const body = await readJson(request);
+        if (
+          !body ||
+          typeof body !== "object" ||
+          Array.isArray(body) ||
+          typeof body.accountId !== "string" ||
+          !body.accountId
+        ) {
+          return sendJson(response, 400, { error: "Select a connected Instagram account" });
+        }
         const asset = await repository.getAsset(assetId);
         if (!asset) {
           return sendJson(response, 404, { error: "Video not found" });
         }
 
-        if (asset.status !== "processed") {
+        if (asset.status !== "processed" || asset.platform !== "instagram") {
           return sendJson(response, 409, {
-            error: "Video is not ready to publish. Current status: " + asset.status,
+            error: "Select Instagram and process the video before publishing. Current status: " + asset.status,
           });
         }
 
-        const connection = await repository.getConnection(assetId);
+        const connection = await repository.getConnectionByPlatform(
+          body.accountId,
+          "instagram",
+        );
         if (!connection) {
-          return sendJson(response, 400, { error: "No publishing connection found" });
+          return sendJson(response, 400, { error: "The selected Instagram account is not connected" });
         }
 
         const publisher = await repository.getPublisher(asset.platform);
         if (!publisher) {
           return sendJson(response, 400, { error: "No publisher for platform" });
         }
+        const claimed = await repository.startPublishing(assetId);
+        if (!claimed) {
+          return sendJson(response, 409, { error: "Video is already publishing or is no longer ready" });
+        }
 
         let result;
+        let verification;
         try {
           result = await publisher.publishToPlatform(
             asset,
             asset.platform,
             connection
           );
-        } catch (error) {
-          if (error instanceof PublishingError) {
-            await repository.markPublishingFailed(
-              assetId,
-              error.message,
-              error.retryable,
-              new Date(),
+          verification = await publisher.verifyPublication(asset, result);
+          if (!verification.verified) {
+            throw new PlatformPublishError(
+              "Instagram did not confirm the published Reel",
+              "instagram",
+              502,
+              false,
             );
-            return sendJson(response, 502, {
-              error: error.message,
-              retryable: error.retryable,
-            });
           }
-          throw error;
-        }
-
-        const verification = await publisher.verifyPublication(asset, result);
-        if (!verification.verified) {
+        } catch (error) {
+          const retryable = error instanceof PlatformPublishError
+            ? error.retryable
+            : false;
+          await repository.markPublishingFailed(
+            assetId,
+            error.message || "Instagram publishing failed",
+            retryable,
+            new Date(),
+          );
           return sendJson(response, 502, {
-            error: "Publication verification failed",
+            error: error.message || "Instagram publishing failed",
+            retryable,
           });
         }
 
-        await repository.markPublished(assetId, {
-          platform: result.platform,
-          postId: result.postId,
-          caption: result.caption,
-          hashtagString: result.hashtagString,
-          publishedAt: result.publishedAt,
-        }, result.publishedAt);
-
-        await repository.cleanupLocalFiles(assetId);
+        try {
+          const saved = await repository.markPublished(assetId, {
+            platform: result.platform,
+            postId: result.postId,
+            postUrl: verification.postUrl || result.postUrl,
+            caption: result.caption,
+            hashtagString: result.hashtagString,
+            publishedAt: result.publishedAt,
+          }, result.publishedAt);
+          if (!saved) {
+            throw new Error("Supabase did not confirm the publishing status update");
+          }
+        } catch (error) {
+          logger.error?.("Instagram confirmed the Reel but its status could not be saved", {
+            assetId,
+            error,
+          });
+          return sendJson(response, 503, {
+            error: "Instagram confirmed the Reel, but AutoReel could not save its status. Check Instagram before trying again.",
+          });
+        }
 
         return sendJson(response, 200, {
           asset: serializeAsset(await repository.getAsset(assetId)),
-          result,
+          result: {
+            ...result,
+            verified: true,
+            postUrl: verification.postUrl || result.postUrl || null,
+          },
         });
       }
 
@@ -491,14 +617,12 @@ export function createApiServer({
             publishedAt: result.publishedAt,
           }, result.publishedAt);
 
-          await repository.cleanupLocalFiles(assetId);
-
           return sendJson(response, 200, {
             asset: serializeAsset(await repository.getAsset(assetId)),
             result,
           });
         } catch (error) {
-          if (error instanceof PublishingError) {
+          if (error instanceof PlatformPublishError) {
             await repository.markPublishingFailed(
               assetId,
               error.message,

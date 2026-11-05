@@ -105,8 +105,6 @@ export class CronScheduler {
 
           if (success) {
             await this.engine.recordPublishResult(asset._id, result, true);
-            await this.engine.cleanupLocalFiles(asset);
-
             results.published.push({
               assetId: asset._id,
               platform: result.platform,

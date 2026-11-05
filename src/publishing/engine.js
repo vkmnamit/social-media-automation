@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { MongoAssetRepository } from "../storage/mongo-repository.js";
 
 
 export { ExponentialBackoff } from "../util/retry.js";
@@ -95,7 +94,12 @@ export class PublishingEngine {
       import("./youtube-shorts.js"),
     ]);
     this.publishers = {
-      instagram: new instagram.InstagramPublisher({ config: this.config, fetchImpl: this.fetch, now: this.now }),
+      instagram: new instagram.InstagramPublisher({
+        config: this.config,
+        storageClient: this.repository.client,
+        fetchImpl: this.fetch,
+        now: this.now,
+      }),
       facebook: new facebook.FacebookPublisher({ config: this.config, fetchImpl: this.fetch, now: this.now }),
       youtube: new youtube.YouTubePublisher({ config: this.config, fetchImpl: this.fetch, now: this.now }),
       youtube_shorts: new shorts.YouTubeShortsPublisher({ config: this.config, fetchImpl: this.fetch, now: this.now }),
@@ -128,12 +132,25 @@ export class PublishingEngine {
 
     await this.validatePublisher(publisher, connection);
 
-    const result = await this.performPublish(publisher, asset, {
-      post: options.post,
-      publishedAt: options.publishedAt,
-    });
+    const result = await this.performPublish(
+      publisher,
+      { ...asset, status: "publishing", connection },
+      {
+        post: options.post,
+        publishedAt: options.publishedAt,
+      },
+    );
 
     return result;
+  }
+
+  async verifyPublication(asset, result) {
+    const publisher =
+      (await this.ensurePublishers())[result?.platform || asset?.platform];
+    if (!publisher?.verifyPublication) {
+      return { verified: Boolean(result?.postId), postUrl: result?.postUrl || null };
+    }
+    return publisher.verifyPublication(asset, result);
   }
 
   async performPublish(publisher, asset, { post, publishedAt }) {
@@ -144,6 +161,7 @@ export class PublishingEngine {
       const publishResult = await publisher.publishPost(asset, {
         post,
         publishedAt: publishedAt || new Date(),
+        media,
       });
 
       const durationMs = this.now().getTime() - startTime.getTime();
@@ -234,4 +252,3 @@ export class PublishingEngine {
     return await this.publishToPlatform(asset, platform, connection);
   }
 }
-

@@ -1,5 +1,4 @@
 import { randomUUID, timingSafeEqual } from "node:crypto";
-import { MongoAssetRepository } from "../storage/mongo-repository.js";
 import { OAuthService } from "../oauth/service.js";
 import { StorageManager } from "../storage/manager.js";
 import { PublishingEngine } from "../publishing/engine.js";
@@ -63,7 +62,7 @@ export class MultiAccountManager {
     if (platform) {
       return this.repository.getConnectionByPlatform(accountId, platform);
     }
-    return this.repository.getConnection(assetId);
+    return this.repository.getConnection(accountId);
   }
 
   async connectAccount(accountId, platform, token) {
@@ -103,10 +102,7 @@ export class MultiAccountManager {
   }
 
   async disconnectAccount(accountId, platform) {
-    const result = await this.repository.oauthConnections.deleteOne({
-      platform,
-      accountId,
-    });
+    const result = await this.repository.deleteConnection(accountId, platform);
 
     return {
       message: result.deletedCount > 0 ? "Account disconnected" : "Account not found",

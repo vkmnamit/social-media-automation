@@ -11,8 +11,27 @@ function positiveNumber(env, name, fallback) {
 }
 
 export function loadConfig(env = process.env) {
-  if (!env.MONGODB_URI) {
-    throw new Error("MONGODB_URI is required");
+  const supabaseUrl = env.SUPABASE_URL || env.supabase_url;
+  const supabaseServiceRoleKey =
+    env.SUPABASE_SERVICE_ROLE_KEY || env.supabase_service_role_key;
+  if (!supabaseUrl) {
+    throw new Error("SUPABASE_URL is required");
+  }
+  if (!supabaseServiceRoleKey) {
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY is required");
+  }
+  let parsedSupabaseUrl;
+  try {
+    parsedSupabaseUrl = new URL(supabaseUrl);
+  } catch {
+    throw new Error("SUPABASE_URL must be a valid absolute URL");
+  }
+  if (
+    !["https:", "http:"].includes(parsedSupabaseUrl.protocol) ||
+    (parsedSupabaseUrl.protocol === "http:" &&
+      !["localhost", "127.0.0.1", "[::1]"].includes(parsedSupabaseUrl.hostname))
+  ) {
+    throw new Error("SUPABASE_URL must use HTTPS except for localhost");
   }
   if (
     !env.ADMIN_API_TOKEN ||
@@ -47,7 +66,7 @@ export function loadConfig(env = process.env) {
   ) {
     throw new Error("PUBLIC_BASE_URL must use HTTPS except for localhost");
   }
-  const metaGraphApiVersion = env.META_GRAPH_API_VERSION || "";
+  const metaGraphApiVersion = env.META_GRAPH_API_VERSION || "v26.0";
   if (metaGraphApiVersion && !/^v\d+\.\d+$/.test(metaGraphApiVersion)) {
     throw new Error("META_GRAPH_API_VERSION must look like vNN.N");
   }
@@ -74,8 +93,9 @@ export function loadConfig(env = process.env) {
   }
 
   return Object.freeze({
-    mongoUri: env.MONGODB_URI,
-    mongoDatabase: env.MONGODB_DATABASE || "autoreel",
+    supabaseUrl: parsedSupabaseUrl.origin,
+    supabaseServiceRoleKey,
+    supabaseMediaBucket: env.SUPABASE_MEDIA_BUCKET || "autoreel-publishing",
     adminApiToken: env.ADMIN_API_TOKEN,
     tokenEncryptionKey: encryptionKey,
     publicBaseUrl: publicBaseUrl.origin,

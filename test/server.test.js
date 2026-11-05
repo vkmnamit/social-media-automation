@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { access, mkdtemp, readFile, rm } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -90,14 +90,242 @@ test("dashboard is public while API requires its bearer token", async (t) => {
   assert.equal(asset.originalName, "licensed clip.mp4");
   assert.equal(asset.status, "uploaded");
   assert.equal(asset.kind, "original");
+  const updatedMetadata = await fetch(`${baseUrl}/api/assets/${asset.id}`, {
+    method: "PATCH",
+    headers: {
+      authorization: headers.authorization,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      caption: "Test caption",
+      hashtags: ["#reels"],
+      platform: "instagram",
+    }),
+  });
+  assert.equal(updatedMetadata.status, 200);
+  assert.equal((await updatedMetadata.json()).asset.status, "uploaded");
   await access(path.join(root, "original", `${asset.id}.mp4`));
   assert.equal(await readFile(path.join(root, "original", `${asset.id}.mp4`), "utf8"), "test video bytes");
+
+  const previewUrl = `${baseUrl}/api/assets/${encodeURIComponent(asset.id)}/video`;
+  const unauthorizedPreview = await fetch(previewUrl);
+  assert.equal(unauthorizedPreview.status, 401);
+
+  const preview = await fetch(previewUrl, {
+    headers: {
+      authorization: headers.authorization,
+      range: "bytes=0-3",
+    },
+  });
+  assert.equal(preview.status, 206);
+  assert.equal(preview.headers.get("content-range"), "bytes 0-3/16");
+  assert.equal(await preview.text(), "test");
+
+  const invalidRange = await fetch(previewUrl, {
+    headers: {
+      authorization: headers.authorization,
+      range: "bytes=16-20",
+    },
+  });
+  assert.equal(invalidRange.status, 416);
+  assert.equal(invalidRange.headers.get("content-range"), "bytes */16");
+
+  const missingPreview = await fetch(`${baseUrl}/api/assets/missing/video`, {
+    headers: { authorization: headers.authorization },
+  });
+  assert.equal(missingPreview.status, 404);
 
   const listed = await fetch(`${baseUrl}/api/assets`, {
     headers: { authorization: `Bearer ${config.adminApiToken}` },
   });
   assert.equal(listed.status, 200);
   assert.equal((await listed.json()).assets.length, 1);
+});
+
+test("verified publishing keeps the local video available through the retention window", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "autoreel-published-preview-"));
+  const videoPath = path.join(root, "edited", "clip.mp4");
+  await mkdir(path.dirname(videoPath), { recursive: true });
+  await writeFile(videoPath, "published video");
+  const repository = new TestRepository();
+  const asset = {
+    assetId: "asset-preview",
+    kind: "edited",
+    status: "processed",
+    platform: "instagram",
+    localPath: "edited/clip.mp4",
+    localPaths: ["edited/clip.mp4"],
+    mimeType: "video/mp4",
+    posts: [],
+  };
+  await repository.addAsset(asset);
+  repository.getConnection = async () => ({ accountId: "account" });
+  repository.getConnectionByPlatform = async () => ({
+    accountId: "account",
+    platform: "instagram",
+  });
+  repository.startPublishing = async () => true;
+  repository.markPublished = async (assetId, post, publishedAt) => {
+    const savedAsset = repository.assets.get(assetId);
+    savedAsset.status = "published";
+    savedAsset.publishedAt = publishedAt;
+    savedAsset.publishedPost = post;
+    return true;
+  };
+  repository.getPublisher = async () => ({
+    async publishToPlatform() {
+      return {
+        platform: "instagram",
+        postId: "post-id",
+        postUrl: "https://instagram.com/p/post-id",
+        caption: "",
+        hashtagString: "",
+        publishedAt: new Date("2026-01-03T00:00:00Z"),
+      };
+    },
+    async verifyPublication() {
+      return { verified: true };
+    },
+  });
+  repository.markPublished = async (assetId, post, publishedAt) => {
+    const savedAsset = repository.assets.get(assetId);
+    savedAsset.status = "published";
+    savedAsset.publishedAt = publishedAt;
+    savedAsset.publishedPost = post;
+    return true;
+  };
+  let cleanupCalled = false;
+  repository.cleanupLocalFiles = async () => {
+    cleanupCalled = true;
+  };
+  const config = {
+    adminApiToken: "a-secure-test-token-with-at-least-32-characters",
+    storageDir: root,
+  };
+  const server = createApiServer({
+    config,
+    repository,
+    storage: {},
+    logger: { error() {} },
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(async () => {
+    await new Promise((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve())),
+    );
+    await rm(root, { recursive: true, force: true });
+  });
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+  const authorization = `Bearer ${config.adminApiToken}`;
+
+  const published = await fetch(`${baseUrl}/api/assets/asset-preview/publish`, {
+    method: "POST",
+    headers: {
+      authorization,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ accountId: "instagram-account" }),
+  });
+  assert.equal(published.status, 200);
+  assert.equal((await published.json()).asset.status, "published");
+  assert.equal(cleanupCalled, false);
+
+  const preview = await fetch(`${baseUrl}/api/assets/asset-preview/video`, {
+    headers: { authorization },
+  });
+  assert.equal(preview.status, 200);
+  assert.equal(await preview.text(), "published video");
+});
+
+test("Instagram publish endpoint requires a selected connected account and persists confirmed post details", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "autoreel-instagram-route-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const repository = new TestRepository();
+  await repository.addAsset({
+    assetId: "asset-instagram",
+    kind: "edited",
+    status: "processed",
+    platform: "instagram",
+    localPath: "edited/clip.mp4",
+    localPaths: ["edited/clip.mp4"],
+    caption: "Test Reel",
+  });
+  let publishedCalls = 0;
+  repository.getConnectionByPlatform = async (accountId, platform) =>
+    accountId === "instagram-account" && platform === "instagram"
+      ? { platform, accountId }
+      : null;
+  repository.getPublisher = async () => ({
+    async publishToPlatform() {
+      publishedCalls += 1;
+      return {
+        platform: "instagram",
+        postId: "media-id",
+        postUrl: "https://www.instagram.com/reel/media-id/",
+        publishedAt: new Date("2026-11-06T00:00:00Z"),
+      };
+    },
+    async verifyPublication(_asset, result) {
+      return { verified: Boolean(result.postId), postUrl: result.postUrl };
+    },
+  });
+  repository.startPublishing = async (assetId) => {
+    const asset = repository.assets.get(assetId);
+    if (asset.status !== "processed") return false;
+    asset.status = "publishing";
+    return true;
+  };
+  repository.markPublished = async (assetId, post, publishedAt) => {
+    const asset = repository.assets.get(assetId);
+    Object.assign(asset, {
+      status: "published",
+      publishedAt,
+      publishedPost: post,
+      posts: [post],
+    });
+    return true;
+  };
+  const config = {
+    adminApiToken: "a-secure-test-token-with-at-least-32-characters",
+    storageDir: root,
+  };
+  const server = createApiServer({
+    config,
+    repository,
+    storage: {},
+    logger: { error() {} },
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(async () => {
+    await new Promise((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve())),
+    );
+  });
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+  const headers = {
+    authorization: `Bearer ${config.adminApiToken}`,
+    "content-type": "application/json",
+  };
+
+  const noAccount = await fetch(`${baseUrl}/api/assets/asset-instagram/publish`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({}),
+  });
+  assert.equal(noAccount.status, 400);
+  assert.equal(publishedCalls, 0);
+
+  const response = await fetch(`${baseUrl}/api/assets/asset-instagram/publish`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ accountId: "instagram-account" }),
+  });
+  assert.equal(response.status, 200);
+  const { asset, result } = await response.json();
+  assert.equal(asset.status, "published");
+  assert.equal(asset.postUrl, "https://www.instagram.com/reel/media-id/");
+  assert.equal(result.verified, true);
+  assert.equal(publishedCalls, 1);
 });
 
 test("upload endpoint rejects non-video formats and oversized content", async (t) => {

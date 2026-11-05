@@ -194,12 +194,25 @@ test("OAuth refuses to start without configured provider credentials", async () 
 
 test("configuration requires strong admin and encryption keys and a valid public URL", () => {
   const base = {
-    MONGODB_URI: "mongodb://localhost:27017",
+    SUPABASE_URL: "https://example.supabase.co",
+    SUPABASE_SERVICE_ROLE_KEY: "test-service-role-key",
     ADMIN_API_TOKEN: "a-secure-test-token-with-at-least-32-characters",
     TOKEN_ENCRYPTION_KEY: randomBytes(32).toString("base64"),
     PUBLIC_BASE_URL: "https://reel.example.test",
   };
   assert.equal(loadConfig(base).publicBaseUrl, "https://reel.example.test");
+  assert.equal(loadConfig(base).metaGraphApiVersion, "v26.0");
+  assert.equal(loadConfig(base).supabaseMediaBucket, "autoreel-publishing");
+  assert.equal(
+    loadConfig({
+      ...base,
+      SUPABASE_URL: undefined,
+      SUPABASE_SERVICE_ROLE_KEY: undefined,
+      supabase_url: base.SUPABASE_URL,
+      supabase_service_role_key: base.SUPABASE_SERVICE_ROLE_KEY,
+    }).supabaseUrl,
+    base.SUPABASE_URL,
+  );
   assert.throws(
     () => loadConfig({ ...base, TOKEN_ENCRYPTION_KEY: "not-a-32-byte-key" }),
     /base64-encoded 32-byte key/,

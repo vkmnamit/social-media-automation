@@ -1,18 +1,22 @@
 import "dotenv/config";
-import { MongoClient } from "mongodb";
+import { createClient } from "@supabase/supabase-js";
 import { loadConfig } from "./config.js";
 import { OAuthService } from "./oauth/service.js";
 import { createApiServer } from "./server.js";
-import { MongoAssetRepository } from "./storage/mongo-repository.js";
+import { SupabaseAssetRepository } from "./storage/supabase-repository.js";
 import { StorageManager } from "./storage/manager.js";
 import { MultiAccountManager } from "./accounts/manager.js";
 import { AnalyticsDashboard } from "./analytics/dashboard.js";
 
 const config = loadConfig();
-const client = new MongoClient(config.mongoUri);
-await client.connect();
-
-const repository = new MongoAssetRepository(client.db(config.mongoDatabase));
+const supabase = createClient(config.supabaseUrl, config.supabaseServiceRoleKey, {
+  auth: {
+    autoRefreshToken: false,
+    detectSessionInUrl: false,
+    persistSession: false,
+  },
+});
+const repository = new SupabaseAssetRepository(supabase, config);
 
 const storage = new StorageManager({
   repository,
@@ -76,7 +80,6 @@ async function shutdown(signal) {
   await new Promise((resolve, reject) => {
     server.close((error) => (error ? reject(error) : resolve()));
   });
-  await client.close();
 }
 
 process.once("SIGINT", () => void shutdown("SIGINT"));

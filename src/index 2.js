@@ -1,16 +1,14 @@
 import "dotenv/config";
-import { MongoClient } from "mongodb";
+import { createClient } from "@supabase/supabase-js";
 import { loadConfig } from "./config.js";
-import { MongoAssetRepository } from "./storage/mongo-repository.js";
+import { SupabaseAssetRepository } from "./storage/supabase-repository.js";
 import { StorageManager } from "./storage/manager.js";
 
 const config = loadConfig();
-const client = new MongoClient(config.mongoUri);
-
-await client.connect();
-const repository = new MongoAssetRepository(
-  client.db(config.mongoDatabase),
-);
+const supabase = createClient(config.supabaseUrl, config.supabaseServiceRoleKey, {
+  auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
+});
+const repository = new SupabaseAssetRepository(supabase, config);
 await repository.initialize();
 
 const storage = new StorageManager({
@@ -47,7 +45,6 @@ async function shutdown(signal) {
   stopping = true;
   console.info(`Received ${signal}; shutting down`);
   clearInterval(cleanupTimer);
-  await client.close();
 }
 
 process.once("SIGINT", () => void shutdown("SIGINT"));
