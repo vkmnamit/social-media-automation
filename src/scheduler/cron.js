@@ -80,14 +80,12 @@ export class CronScheduler {
 
     try {
       const queuedAssets = await this.repository.findQueuedAssets();
-      results.skipped = queuedAssets.map((a) => ({
-        assetId: a._id,
-        reason: "Not processed yet",
-      }));
-
-      const processedAssets = queuedAssets.filter((a) => a.status === "processed");
-      for (const asset of processedAssets) {
+      for (const asset of queuedAssets) {
         try {
+          if (!(await this.repository.startPublishing(asset._id))) {
+            results.skipped.push({ assetId: asset._id, reason: "No longer queued" });
+            continue;
+          }
           const connection = await this.repository.getConnection(asset._id);
           if (!connection) {
             throw new Error("No connection found");

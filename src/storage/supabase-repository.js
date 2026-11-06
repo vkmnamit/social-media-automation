@@ -201,7 +201,10 @@ export class SupabaseAssetRepository {
       return mapConnection(data);
     }
     if (asset.accountId && asset.platform) {
-      return this.getConnectionByPlatform(asset.accountId, asset.platform);
+      const connectionPlatform = asset.platform === "youtube_shorts"
+        ? "youtube"
+        : asset.platform;
+      return this.getConnectionByPlatform(asset.accountId, connectionPlatform);
     }
     return null;
   }
@@ -306,7 +309,7 @@ export class SupabaseAssetRepository {
   async startPublishing(assetId) {
     return this.patchAsset(
       assetId,
-      ["processed", "upload_failed", "recovery"],
+      ["processed", "queued", "upload_failed", "recovery"],
       {
         status: "publishing",
         failureMessage: null,
@@ -351,15 +354,25 @@ export class SupabaseAssetRepository {
     );
   }
 
-  async queueForPublishing(assetId, platform) {
+  async queueForPublishing(assetId, {
+    platform,
+    accountId,
+    title,
+    scheduledAt = null,
+    privacyStatus = "private",
+  }) {
     const now = new Date();
     return this.patchAsset(
       assetId,
       ["processed"],
       {
         platform,
+        accountId,
+        title,
+        privacyStatus,
         status: "queued",
         queuedAt: now,
+        scheduledAt,
         publicationAttempt: 0,
         retryCount: 0,
         publishFlowStage: "queued",

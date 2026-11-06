@@ -82,6 +82,10 @@ function serializeAsset(asset) {
     id: asset._id,
     kind: asset.kind,
     status: asset.status,
+    platform: asset.platform || null,
+    scheduledAt: asset.scheduledAt || null,
+    title: asset.title || "",
+    privacyStatus: asset.privacyStatus || null,
     originalName: asset.originalName,
     caption: asset.caption || "",
     hashtags: asset.hashtags || [],
@@ -394,7 +398,7 @@ export function createApiServer({
       }
 
       const assetRoute = url.pathname.match(
-        /^\/api\/assets\/([^/]+)(?:\/(process|publish|retry))?$/,
+        /^\/api\/assets\/([^/]+)(?:\/(process|publish|retry|queue))?$/,
       );
       if (request.method === "PATCH" && assetRoute && !assetRoute[2]) {
         const body = await readJson(request);
@@ -422,6 +426,59 @@ export function createApiServer({
           asset: serializeAsset(
             await repository.getAsset(decodeURIComponent(assetRoute[1])),
           ),
+        });
+      }
+
+      if (assetRoute && request.method === "POST" && assetRoute[2] === "queue") {
+        const assetId = decodeURIComponent(assetRoute[1]);
+        const body = await readJson(request);
+        if (
+          !body ||
+          typeof body !== "object" ||
+          Array.isArray(body) ||
+          body.platform !== "youtube_shorts" ||
+          typeof body.accountId !== "string" ||
+          !body.accountId ||
+          typeof body.title !== "string" ||
+          !body.title.trim() ||
+          body.title.trim().length > 100
+        ) {
+          return sendJson(response, 400, {
+            error: "platform must be youtube_shorts, accountId must name a connected YouTube channel, and title must be 1–100 characters",
+          });
+        }
+        const privacyStatus = body.privacyStatus || "private";
+        if (!["private", "unlisted", "public"].includes(privacyStatus)) {
+          return sendJson(response, 400, { error: "privacyStatus must be private, unlisted, or public" });
+        }
+        let scheduledAt = null;
+        if (body.scheduledAt !== undefined && body.scheduledAt !== null) {
+          scheduledAt = new Date(body.scheduledAt);
+          if (!Number.isFinite(scheduledAt.getTime()) || scheduledAt <= new Date()) {
+            return sendJson(response, 400, { error: "scheduledAt must be a future date" });
+          }
+        }
+        const asset = await repository.getAsset(assetId);
+        if (!asset) return sendJson(response, 404, { error: "Video not found" });
+        if (asset.status !== "processed" || !asset.localPath) {
+          return sendJson(response, 409, { error: "Only processed videos with a local file can be queued" });
+        }
+        const connection = await repository.getConnectionByPlatform(body.accountId, "youtube");
+        if (!connection) {
+          return sendJson(response, 400, { error: "The selected YouTube channel is not connected" });
+        }
+        const queued = await repository.queueForPublishing(assetId, {
+          platform: body.platform,
+          accountId: body.accountId,
+          title: body.title.trim(),
+          scheduledAt,
+          privacyStatus,
+        });
+        if (!queued) {
+          return sendJson(response, 409, { error: "Video is no longer ready to queue" });
+        }
+        return sendJson(response, 200, {
+          asset: serializeAsset(await repository.getAsset(assetId)),
         });
       }
 

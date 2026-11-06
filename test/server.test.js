@@ -487,3 +487,66 @@ test("OAuth initiation requires admin auth and callback returns backend JSON wit
   }]);
   assert.equal(JSON.stringify(callbackErrors).includes("sensitive-authorization-code"), false);
 });
+
+test("YouTube Shorts queue endpoint requires a connected channel and records private by default", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "autoreel-youtube-queue-"));
+  const repository = new TestRepository();
+  await repository.addAsset({
+    assetId: "youtube-asset",
+    kind: "edited",
+    status: "processed",
+    localPath: "edited/youtube-asset.mp4",
+    caption: "",
+    hashtags: [],
+  });
+  repository.getConnectionByPlatform = async (accountId, platform) =>
+    accountId === "channel-1" && platform === "youtube"
+      ? { accountId, platform, encryptedAccessToken: { ciphertext: "token" } }
+      : null;
+  repository.queueForPublishing = async (assetId, options) => {
+    const asset = await repository.getAsset(assetId);
+    Object.assign(asset, options, { status: "queued" });
+    return true;
+  };
+
+  const config = {
+    adminApiToken: "a-secure-test-token-with-at-least-32-characters",
+    publicBaseUrl: "https://reel.example.test",
+    storageDir: root,
+    maxStorageBytes: 1024,
+    maxUploadBytes: 1024,
+    maxTranscodeBytes: 1024,
+  };
+  const server = createApiServer({ config, repository, storage: {} });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(async () => {
+    await new Promise((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve())),
+    );
+    await rm(root, { recursive: true, force: true });
+  });
+
+  const response = await fetch(
+    `http://127.0.0.1:${server.address().port}/api/assets/youtube-asset/queue`,
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${config.adminApiToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        platform: "youtube_shorts",
+        accountId: "channel-1",
+        title: "A test Short",
+      }),
+    },
+  );
+
+  assert.equal(response.status, 200);
+  const { asset } = await response.json();
+  assert.equal(asset.status, "queued");
+  assert.equal(asset.platform, "youtube_shorts");
+  assert.equal(asset.scheduledAt, null);
+  assert.equal(asset.title, "A test Short");
+  assert.equal(asset.privacyStatus, "private");
+});

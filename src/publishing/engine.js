@@ -207,6 +207,7 @@ export class PublishingEngine {
     await this.repository.markPublished(assetId, {
       platform: result.platform,
       postId: result.postId,
+      postUrl: result.postUrl,
       caption: result.caption,
       hashtagString: result.hashtagString,
       publishedAt: result.publishedAt,

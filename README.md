@@ -71,6 +71,10 @@ on the configured interval.
 - Publish a processed video through `POST /api/assets/{id}/publish`. Instagram
   publishing uses a temporary signed Supabase Storage URL and waits for Meta
   to confirm publication before saving the post ID and URL.
+- Queue a processed YouTube Short with `POST /api/assets/{id}/queue`, providing
+  `platform: "youtube_shorts"`, the connected `accountId`, and a title. An
+  optional ISO `scheduledAt` delays it until the next hourly scheduler run;
+  queued uploads default to private unless `privacyStatus` is set explicitly.
 - Use `GET /api/storage` to inspect local storage usage. Cleanup and recovery
   run in the background according to the configured retention rules.
 

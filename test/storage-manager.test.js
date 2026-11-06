@@ -200,6 +200,7 @@ test("recovery assets can transition back to publishing for retry", async () => 
   assert.equal(update.args.p_id, "recovered-asset");
   assert.deepEqual(update.args.p_expected_statuses, [
     "processed",
+    "queued",
     "upload_failed",
     "recovery",
   ]);
