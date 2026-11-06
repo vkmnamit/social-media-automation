@@ -32,12 +32,17 @@ or direct Postgres connection string is required.
 1. Use Node.js 22 or newer, FFmpeg, and FFprobe. Supabase JS requires Node 22
    for its native WebSocket runtime. Railway uses the included `Dockerfile`,
    which installs FFmpeg and FFprobe in the production image.
-2. Copy `.env.example` to `.env`; configure the Supabase URL and service-role
-   key as described above.
+2. Copy `.env.example` to `.env` for local use, or paste its variable lines
+   into Railway. The template includes the production callback URL; use the
+   exact same callback in the Meta app configuration. Replace all
+   `PASTE_*_HERE` values with newly rotated secrets before deploying.
 3. Generate an admin token with `openssl rand -hex 32` and an encryption key
    with `openssl rand -base64 32`; set `ADMIN_API_TOKEN` and
    `TOKEN_ENCRYPTION_KEY`.
-4. Set `PUBLIC_BASE_URL=http://localhost:3000` for local development.
+4. For local development, set `PUBLIC_BASE_URL=http://localhost:3000` and
+   configure a matching local Meta callback if you use OAuth locally. Railway
+   supplies `PORT` and `RAILWAY_PUBLIC_DOMAIN`; mount a persistent volume at
+   the configured `STORAGE_DIR` (`/app/storage` in the template).
 5. Install dependencies with `npm install`.
 6. Start the API with `npm start`. The service exposes `/health`; all `/api/*`
    routes require `Authorization: Bearer <ADMIN_API_TOKEN>`.
@@ -91,6 +96,8 @@ configuration. The configuration supplies permissions, so the authorization
 URL omits `scope`. The callback exchanges the code for the configured System
 User Access Token, queries assigned Instagram accounts, and saves the encrypted
 token only when at least one authorized account is returned.
+If the callback fails, inspect Railway logs for the provider and stage-specific
+error; authorization codes and tokens are not logged.
 `META_GRAPH_API_VERSION` defaults to `v26.0`. `SUPABASE_MEDIA_BUCKET` defaults to the private
 `autoreel-publishing` bucket, which the server creates when needed using its
 service-role key. Configure `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` only

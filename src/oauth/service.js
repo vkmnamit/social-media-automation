@@ -20,11 +20,20 @@ function assertProvider(provider) {
   }
 }
 
-function safeResponse(response, context) {
-  if (!response.ok) {
-    throw new Error(`${context} failed with status ${response.status}`);
+async function safeResponse(response, context) {
+  const result = await response.json();
+  if (!response.ok || result.error) {
+    const providerError = result.error;
+    const details = [
+      providerError?.message,
+      providerError?.type && `type ${providerError.type}`,
+      providerError?.code !== undefined && `code ${providerError.code}`,
+    ].filter(Boolean).join("; ");
+    throw new Error(
+      `${context} failed with status ${response.status}${details ? `: ${details}` : ""}`,
+    );
   }
-  return response.json();
+  return result;
 }
 
 export class OAuthService {

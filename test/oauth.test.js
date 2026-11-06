@@ -234,6 +234,36 @@ test("Login for Business callback does not save a token when no Instagram accoun
   assert.equal(repository.connections.length, 0);
 });
 
+test("Meta OAuth errors include provider diagnostics and do not save a connection", async () => {
+  const repository = new OAuthMemoryRepository();
+  const service = new OAuthService({
+    config: createConfig(),
+    repository,
+    fetchImpl: async () => Response.json(
+      {
+        error: {
+          message: "Invalid OAuth access token",
+          type: "OAuthException",
+          code: 190,
+        },
+      },
+      { status: 400 },
+    ),
+  });
+  const state = "s".repeat(43);
+  await repository.createOAuthState({
+    state,
+    provider: "meta",
+    expiresAt: new Date(Date.now() + 60_000),
+  });
+
+  await assert.rejects(
+    service.handleCallback("meta", { state, code: "authorization-code" }),
+    /Facebook Login for Business code exchange failed with status 400: Invalid OAuth access token; type OAuthException; code 190/,
+  );
+  assert.equal(repository.connections.length, 0);
+});
+
 test("token vault encrypts tokens and detects tampering", () => {
   const vault = new TokenVault(randomBytes(32));
   const encrypted = vault.encrypt("provider-access-token");

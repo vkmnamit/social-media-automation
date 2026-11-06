@@ -376,6 +376,7 @@ test("upload endpoint rejects non-video formats and oversized content", async (t
 
 test("OAuth initiation requires admin auth and callback returns backend JSON without token data", async (t) => {
   const root = await mkdtemp(path.join(os.tmpdir(), "autoreel-oauth-routes-"));
+  const callbackErrors = [];
   const config = {
     adminApiToken: "a-secure-test-token-with-at-least-32-characters",
     publicBaseUrl: "https://reel.example.test",
@@ -389,6 +390,10 @@ test("OAuth initiation requires admin auth and callback returns backend JSON wit
       return `https://accounts.example.test/${provider}`;
     },
     async handleCallback(provider, params) {
+      if (provider === "meta") {
+        assert.equal(params.code, "sensitive-authorization-code");
+        throw new Error("Meta code exchange failed with status 400: Invalid client");
+      }
       assert.equal(provider, "google");
       assert.equal(params.state, "state-value");
       assert.equal(params.code, "code-value");
@@ -403,7 +408,11 @@ test("OAuth initiation requires admin auth and callback returns backend JSON wit
     repository: new TestRepository(),
     storage: {},
     oauthService,
-    logger: { error() {} },
+    logger: {
+      error(message, details) {
+        callbackErrors.push({ message, details });
+      },
+    },
   });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   t.after(async () => {
@@ -434,4 +443,19 @@ test("OAuth initiation requires admin auth and callback returns backend JSON wit
   );
   assert.equal(callback.status, 200);
   assert.deepEqual(await callback.json(), { connected: "google", accounts: 1 });
+
+  const failedCallback = await fetch(
+    `${baseUrl}/oauth/meta/callback?state=state-value&code=sensitive-authorization-code`,
+  );
+  assert.equal(failedCallback.status, 400);
+  assert.deepEqual(await failedCallback.json(), { error: "OAuth connection failed" });
+  assert.deepEqual(callbackErrors, [{
+    message: "OAuth callback failed",
+    details: {
+      provider: "meta",
+      errorName: "Error",
+      errorMessage: "Meta code exchange failed with status 400: Invalid client",
+    },
+  }]);
+  assert.equal(JSON.stringify(callbackErrors).includes("sensitive-authorization-code"), false);
 });

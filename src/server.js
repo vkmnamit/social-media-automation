@@ -160,6 +160,9 @@ export function createApiServer({
           logger.error?.("OAuth callback failed", {
             provider: callbackRoute[1],
             errorName: error.name,
+            errorMessage: String(error.message || "Unknown error")
+              .replace(/[\r\n]/g, " ")
+              .slice(0, 400),
           });
           return sendJson(response, 400, { error: "OAuth connection failed" });
         }
