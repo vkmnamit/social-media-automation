@@ -158,7 +158,7 @@ export function loadConfig(env = process.env) {
     metaGraphApiVersion,
     googleClientId: env.youtube_client_id || env.GOOGLE_CLIENT_ID || "",
     googleClientSecret: env.youtube_client_secret || env.GOOGLE_CLIENT_SECRET || "",
-    googleRedirectUri: env.youtube_redirect_uri || env.GOOGLE_REDIRECT_URI || "",
+    googleRedirectUri: env.youtube_redirect_uri || "",
     port,
     storageDir: path.resolve(env.STORAGE_DIR || "./storage"),
     maxStorageBytes,
