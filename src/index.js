@@ -76,6 +76,7 @@ async function shutdown(signal) {
   if (stopping) return;
   stopping = true;
   console.info(`Received ${signal}; shutting down`);
+  multiAccountManager.stopScheduler();
   clearInterval(cleanupTimer);
   await new Promise((resolve, reject) => {
     server.close((error) => (error ? reject(error) : resolve()));
@@ -87,6 +88,8 @@ process.once("SIGTERM", () => void shutdown("SIGTERM"));
 
 server.listen(config.port, "0.0.0.0", () => {
   console.info(`Backend API listening on port ${config.port}`);
+  const scheduler = multiAccountManager.startScheduler();
+  console.info("Publishing scheduler started", scheduler);
 });
 await runCleanup();
 cleanupTimer = setInterval(runCleanup, config.cleanupIntervalMs);
