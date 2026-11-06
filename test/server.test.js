@@ -490,6 +490,8 @@ test("OAuth initiation requires admin auth and callback returns backend JSON wit
 
 test("YouTube Shorts queue endpoint requires a connected channel and records private by default", async (t) => {
   const root = await mkdtemp(path.join(os.tmpdir(), "autoreel-youtube-queue-"));
+  await mkdir(path.join(root, "edited"), { recursive: true });
+  await writeFile(path.join(root, "edited", "youtube-asset.mp4"), "video data");
   const repository = new TestRepository();
   await repository.addAsset({
     assetId: "youtube-asset",

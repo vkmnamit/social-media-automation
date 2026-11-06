@@ -463,6 +463,13 @@ export function createApiServer({
         if (asset.status !== "processed" || !asset.localPath) {
           return sendJson(response, 409, { error: "Only processed videos with a local file can be queued" });
         }
+        try {
+          await getLocalFile(config.storageDir, asset.localPath);
+        } catch {
+          return sendJson(response, 409, {
+            error: "Video file is missing from Railway storage. Upload and process the video again before queueing it.",
+          });
+        }
         const connection = await repository.getConnectionByPlatform(body.accountId, "youtube");
         if (!connection) {
           return sendJson(response, 400, { error: "The selected YouTube channel is not connected" });
