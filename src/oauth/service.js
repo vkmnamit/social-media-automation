@@ -82,6 +82,9 @@ export class OAuthService {
       authorizeUrl.searchParams.set("redirect_uri", this.callbackUrl(provider));
       authorizeUrl.searchParams.set("response_type", "code");
       authorizeUrl.searchParams.set("state", state);
+      authorizeUrl.searchParams.set("display", "popup");
+      authorizeUrl.searchParams.set("override_default_response_type", "true");
+      authorizeUrl.searchParams.set("prompt", "login");
       return authorizeUrl.toString();
     }
 

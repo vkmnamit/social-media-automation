@@ -70,6 +70,9 @@ test("OAuth authorization URLs use configured redirect URIs and one-time state",
     "https://reel.example.test/oauth/meta/callback",
   );
   assert.equal(metaUrl.searchParams.get("config_id"), "login-config-id");
+  assert.equal(metaUrl.searchParams.get("display"), "popup");
+  assert.equal(metaUrl.searchParams.get("override_default_response_type"), "true");
+  assert.equal(metaUrl.searchParams.get("prompt"), "login");
   assert.equal(metaUrl.searchParams.has("scope"), false);
   assert.equal(repository.states.get(metaState).provider, "meta");
 
@@ -97,6 +100,9 @@ test("Login for Business authorization uses its config ID and no scope parameter
   assert.equal(url.searchParams.get("client_id"), "meta-app-id");
   assert.equal(url.searchParams.get("config_id"), "login-config-id");
   assert.equal(url.searchParams.get("response_type"), "code");
+  assert.equal(url.searchParams.get("display"), "popup");
+  assert.equal(url.searchParams.get("override_default_response_type"), "true");
+  assert.equal(url.searchParams.get("prompt"), "login");
   assert.equal(
     url.searchParams.get("redirect_uri"),
     "https://reel.example.test/oauth/meta/callback",
