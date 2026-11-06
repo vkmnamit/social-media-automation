@@ -420,6 +420,10 @@ test("OAuth initiation requires admin auth and callback returns backend JSON wit
     repository: new TestRepository(),
     storage: {},
     oauthService,
+    multiAccountManager: {
+      isSchedulerRunning: () => true,
+      async listConnections() { return []; },
+    },
     logger: {
       error(message, details) {
         callbackErrors.push({ message, details });
@@ -434,6 +438,12 @@ test("OAuth initiation requires admin auth and callback returns backend JSON wit
     await rm(root, { recursive: true, force: true });
   });
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  const schedulerHealth = await fetch(`${baseUrl}/api/accounts/health`, {
+    headers: { authorization: `Bearer ${config.adminApiToken}` },
+  });
+  assert.equal(schedulerHealth.status, 200);
+  assert.deepEqual(await schedulerHealth.json(), { schedulerRunning: true });
 
   const unauthorizedStart = await fetch(`${baseUrl}/api/oauth/google/start`, {
     method: "POST",

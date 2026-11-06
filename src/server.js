@@ -141,6 +141,7 @@ export function createApiServer({
   repository,
   storage,
   oauthService,
+  multiAccountManager,
   logger = console,
 }) {
   return http.createServer(async (request, response) => {
