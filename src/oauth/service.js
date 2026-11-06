@@ -7,8 +7,8 @@ const META_INSTAGRAM_PERMISSIONS = ["instagram_basic", "instagram_content_publis
 const GOOGLE_SCOPES = [
   "openid",
   "email",
-  "https://www.googleapis.com/auth/youtube.readonly",
   "https://www.googleapis.com/auth/youtube.upload",
+  "https://www.googleapis.com/auth/youtube",
 ];
 const PROVIDERS = new Set(["meta", "google"]);
 

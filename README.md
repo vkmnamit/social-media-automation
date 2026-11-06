@@ -113,6 +113,8 @@ error; authorization codes and tokens are not logged.
 service-role key. Configure `youtube_client_id`, `youtube_client_secret`, and
 `youtube_redirect_uri` for YouTube OAuth. The app also accepts the equivalent
 `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` names.
+YouTube authorization requests `youtube.upload` for uploads and `youtube` to
+update video metadata and visibility.
 The default Google redirect is `/oauth/youtube/callback`; the standard
 `/oauth/google/callback` route is also accepted. Register the exact redirect
 URI in the Google OAuth client.

@@ -78,6 +78,9 @@ test("OAuth authorization URLs use configured redirect URIs and one-time state",
 
   const googleUrl = new URL(await service.createAuthorizationUrl("google"));
   assert.equal(googleUrl.hostname, "accounts.google.com");
+  const googleScopes = googleUrl.searchParams.get("scope").split(/\s+/);
+  assert.ok(googleScopes.includes("https://www.googleapis.com/auth/youtube.upload"));
+  assert.ok(googleScopes.includes("https://www.googleapis.com/auth/youtube"));
   assert.equal(
     googleUrl.searchParams.get("redirect_uri"),
     "https://reel.example.test/oauth/youtube/callback",
