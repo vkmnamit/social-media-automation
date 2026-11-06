@@ -80,7 +80,7 @@ test("OAuth authorization URLs use configured redirect URIs and one-time state",
   assert.equal(googleUrl.hostname, "accounts.google.com");
   assert.equal(
     googleUrl.searchParams.get("redirect_uri"),
-    "https://reel.example.test/oauth/google/callback",
+    "https://reel.example.test/oauth/youtube/callback",
   );
   assert.equal(googleUrl.searchParams.get("access_type"), "offline");
   assert.equal(googleUrl.searchParams.get("prompt"), "consent");

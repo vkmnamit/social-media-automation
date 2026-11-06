@@ -53,7 +53,8 @@ export class OAuthService {
     if (provider === "google" && this.config.googleRedirectUri) {
       return this.config.googleRedirectUri;
     }
-    return new URL(`/oauth/${provider}/callback`, this.config.publicBaseUrl).toString();
+    const callbackPath = provider === "google" ? "/oauth/youtube/callback" : `/oauth/${provider}/callback`;
+    return new URL(callbackPath, this.config.publicBaseUrl).toString();
   }
 
   isConfigured(provider) {

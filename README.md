@@ -109,9 +109,9 @@ error; authorization codes and tokens are not logged.
 service-role key. Configure `youtube_client_id`, `youtube_client_secret`, and
 `youtube_redirect_uri` for YouTube OAuth. The app also accepts the equivalent
 `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_REDIRECT_URI` names.
-The callback route accepts Google’s `/oauth/google/callback` and the configured
-`/oauth/youtube/callback` alias; register the exact URI in the Google OAuth
-client.
+The default Google redirect is `/oauth/youtube/callback`; the standard
+`/oauth/google/callback` route is also accepted. Register the exact redirect
+URI in the Google OAuth client.
 Generate `TOKEN_ENCRYPTION_KEY` with `openssl rand -base64 32` and use the exact
 HTTPS service origin for `PUBLIC_BASE_URL` in production. On Railway, when
 `PUBLIC_BASE_URL` is unset or still points at localhost, the service uses
@@ -120,7 +120,7 @@ HTTPS service origin for `PUBLIC_BASE_URL` in production. On Railway, when
 Register these callback URLs with the provider apps:
 
 - `${PUBLIC_BASE_URL}/oauth/meta/callback`
-- `${PUBLIC_BASE_URL}/oauth/google/callback`
+- `${PUBLIC_BASE_URL}/oauth/youtube/callback`
 
 Deploy as a background worker/web service with a persistent volume mounted at
 `STORAGE_DIR`. Configure all secrets in the hosting provider's environment
