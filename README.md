@@ -106,10 +106,12 @@ If the callback fails, inspect Railway logs for the provider and stage-specific
 error; authorization codes and tokens are not logged.
 `META_GRAPH_API_VERSION` defaults to `v26.0`. `SUPABASE_MEDIA_BUCKET` defaults to the private
 `autoreel-publishing` bucket, which the server creates when needed using its
-service-role key. Configure `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and
-optionally `GOOGLE_REDIRECT_URI` if YouTube is needed. The Google callback path
-is `/oauth/google/callback`; register the exact redirect URI in the Google
-OAuth client.
+service-role key. Configure `youtube_client_id`, `youtube_client_secret`, and
+`youtube_redirect_uri` for YouTube OAuth. The app also accepts the equivalent
+`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_REDIRECT_URI` names.
+The callback route accepts Google’s `/oauth/google/callback` and the configured
+`/oauth/youtube/callback` alias; register the exact URI in the Google OAuth
+client.
 Generate `TOKEN_ENCRYPTION_KEY` with `openssl rand -base64 32` and use the exact
 HTTPS service origin for `PUBLIC_BASE_URL` in production. On Railway, when
 `PUBLIC_BASE_URL` is unset or still points at localhost, the service uses

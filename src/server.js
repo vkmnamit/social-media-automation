@@ -157,14 +157,15 @@ export function createApiServer({
         return sendJson(response, 200, { status: "ok" });
       }
 
-      const callbackRoute = url.pathname.match(/^\/oauth\/(meta|google)\/callback$/);
+      const callbackRoute = url.pathname.match(/^\/oauth\/(meta|google|youtube)\/callback$/);
       if (request.method === "GET" && callbackRoute) {
         if (!oauthService) {
           return sendJson(response, 503, { error: "OAuth is not configured" });
         }
         try {
+          const provider = callbackRoute[1] === "youtube" ? "google" : callbackRoute[1];
           const connections = await oauthService.handleCallback(
-            callbackRoute[1],
+            provider,
             {
               state: url.searchParams.get("state"),
               code: url.searchParams.get("code"),
@@ -174,7 +175,7 @@ export function createApiServer({
             },
           );
           return sendJson(response, 200, {
-            connected: callbackRoute[1],
+            connected: provider,
             accounts: connections.length,
           });
         } catch (error) {

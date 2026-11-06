@@ -456,6 +456,12 @@ test("OAuth initiation requires admin auth and callback returns backend JSON wit
   assert.equal(callback.status, 200);
   assert.deepEqual(await callback.json(), { connected: "google", accounts: 1 });
 
+  const youtubeCallback = await fetch(
+    `${baseUrl}/oauth/youtube/callback?state=state-value&code=code-value`,
+  );
+  assert.equal(youtubeCallback.status, 200);
+  assert.deepEqual(await youtubeCallback.json(), { connected: "google", accounts: 1 });
+
   const failedCallback = await fetch(
     `${baseUrl}/oauth/meta/callback?state=state-value&code=sensitive-authorization-code`,
   );

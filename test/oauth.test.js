@@ -296,6 +296,18 @@ test("configuration requires strong admin and encryption keys and a valid public
     META_REDIRECT_URI: "https://reel.example.test/oauth/meta/callback",
   };
   assert.equal(loadConfig(base).publicBaseUrl, "https://reel.example.test");
+  const youtubeConfig = loadConfig({
+    ...base,
+    youtube_client_id: "youtube-client-id",
+    youtube_client_secret: "youtube-client-secret",
+    youtube_redirect_uri: "https://reel.example.test/oauth/youtube/callback",
+  });
+  assert.equal(youtubeConfig.googleClientId, "youtube-client-id");
+  assert.equal(youtubeConfig.googleClientSecret, "youtube-client-secret");
+  assert.equal(
+    youtubeConfig.googleRedirectUri,
+    "https://reel.example.test/oauth/youtube/callback",
+  );
   assert.equal(
     loadConfig({ ...base, META_GRAPH_API_VERSION: "v19.0" }).metaGraphApiVersion,
     "v19.0",
