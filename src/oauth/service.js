@@ -174,9 +174,31 @@ export class OAuthService {
       await this.fetch(accountsUrl),
       "Authorized Instagram account lookup",
     );
-    const accounts = (accountResult.data || []).filter(
-      (account) => typeof account.id === "string" && account.id.length > 0,
-    );
+    const isValid = (account) =>
+      typeof account?.id === "string" && account.id.length > 0;
+    let accounts = (accountResult.data || []).filter(isValid);
+    let tokenType = "system_user";
+    if (accounts.length === 0) {
+      // User-token configurations don't populate assigned_instagram_accounts;
+      // fall back to Instagram accounts linked to the user's Pages.
+      const pagesUrl = new URL(
+        `https://graph.facebook.com/${this.config.metaGraphApiVersion}/me/accounts`,
+      );
+      pagesUrl.search = new URLSearchParams({
+        fields: "instagram_business_account{id,username}",
+        access_token: token.access_token,
+      }).toString();
+      const pages = await safeResponse(
+        await this.fetch(pagesUrl),
+        "Facebook Page Instagram account lookup",
+      );
+      const seen = new Set();
+      accounts = (pages.data || [])
+        .map((page) => page.instagram_business_account)
+        .filter(isValid)
+        .filter((account) => !seen.has(account.id) && seen.add(account.id));
+      tokenType = "user";
+    }
     if (accounts.length === 0) {
       throw new Error(
         "Meta authorization completed, but the selected Login for Business configuration returned no assigned Instagram accounts",
@@ -191,7 +213,7 @@ export class OAuthService {
       accountId: account.id,
       displayName: account.username || account.id,
       scopes: META_INSTAGRAM_PERMISSIONS,
-      tokenType: "system_user",
+      tokenType,
       loginConfigId: this.config.metaLoginConfigId,
       encryptedAccessToken,
       tokenExpiresAt:
