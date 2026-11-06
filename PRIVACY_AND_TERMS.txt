@@ -1,0 +1,294 @@
+PRIVACY NOTICE AND TERMS OF SERVICE
+
+Draft for review before publication
+Last updated: [DATE]
+
+IMPORTANT
+This document is a starting point for the operator of this service, not legal
+advice and not a substitute for review by a qualified lawyer. Complete every
+bracketed field, confirm that the descriptions match the deployed service and
+its vendors, and obtain legal review for the countries where the service is
+offered. Do not publish this draft with placeholders remaining.
+
+SERVICE OPERATOR
+Legal name: [LEGAL NAME OR BUSINESS NAME]
+Service name: [SERVICE NAME]
+Contact email: [PRIVACY / SUPPORT EMAIL]
+Postal address: [BUSINESS OR CONTACT ADDRESS]
+Governing region: [COUNTRY / STATE / PROVINCE]
+
+PART 1 — PRIVACY NOTICE
+
+1. Who is responsible
+
+[LEGAL NAME OR BUSINESS NAME] ("we", "us", or "our") operates [SERVICE NAME]
+("Service"). We are responsible for personal information handled through the
+Service. Contact us using the details above with privacy questions or requests.
+
+2. Information the Service handles
+
+Depending on the features you use, the Service may handle:
+
+- Account and authorization information: identifiers and display names for
+  Instagram, Facebook/Meta, or Google/YouTube accounts you choose to connect;
+  authorization scopes; connection and authorization timestamps; and provider
+  access tokens needed to perform the actions you request.
+- Videos and publishing details: video files you upload, filenames, captions,
+  hashtags, selected platform/account, processing and publishing status, and
+  provider post identifiers or URLs returned after publishing.
+- OAuth security data: short-lived, single-use state values used to protect
+  account authorization. These expire after approximately ten minutes.
+- Technical and operational data: request method and path, error details,
+  timestamps, and service/storage status that may appear in application or
+  hosting-provider logs for security, troubleshooting, and operations.
+
+Do not upload sensitive personal information unless it is necessary and you
+have a lawful basis and permission to do so.
+
+3. How information is used
+
+We use information to:
+
+- authenticate the accounts you choose to connect;
+- store and manage authorized account connections;
+- receive, store, and process video files and their publishing metadata;
+- publish content to a platform when you explicitly request publication;
+- report operation status, investigate errors, protect the Service, and meet
+  legal obligations.
+
+The Service does not need your social-media password. Authentication is
+provided by the relevant platform. We do not sell personal information or use
+your videos to train generative AI models.
+
+4. Legal bases and choices
+
+Where applicable law requires a legal basis, we process information to provide
+the Service you request, based on your consent or authorization, for our
+legitimate interests in securing and operating the Service, and to comply with
+legal obligations. The applicable basis depends on the processing and your
+location. You can stop using the Service, revoke connected-app access through
+the relevant platform, and contact us about deletion or other privacy rights.
+
+5. Sharing and service providers
+
+Information is sent to or stored with providers needed to operate the features:
+
+- Meta (including Facebook and Instagram) receives authorization and content
+  requests when you connect or publish to a Meta platform.
+- Google may receive authorization or content requests if Google/YouTube
+  features are configured and used.
+- Supabase is used for database and, where configured, media storage.
+- Railway or another configured hosting provider runs the application and may
+  process operational logs and stored files as part of hosting.
+
+Providers process information under their own terms and privacy notices and,
+where applicable, our instructions. We may also disclose information when
+required by law, to protect rights and safety, or as part of a business
+reorganization, subject to applicable law. We do not otherwise sell or rent
+personal information.
+
+6. International processing
+
+Our providers may process information in countries other than the country where
+you live. Where required, we use appropriate safeguards for international
+transfers. Ask us at [PRIVACY / SUPPORT EMAIL] for information about applicable
+safeguards.
+
+7. Retention and deletion
+
+We retain information only as long as needed for the purposes described above,
+legal requirements, and legitimate operational needs. The current application
+defaults are:
+
+- temporary video files: eligible for deletion about 2 hours after processing;
+- local original and edited video files after successful publication: eligible
+  for deletion about 24 hours after publication;
+- failed uploads: retained for about 48 hours before being queued for recovery,
+  rather than automatically deleted at that point;
+- OAuth state: single-use and expires after about 10 minutes.
+
+These periods may be changed by the Service operator's configuration. Cleanup
+runs periodically, so eligibility does not mean deletion occurs at the exact
+hour stated. Publishing metadata, captions, hashtags, status, post identifiers,
+and post URLs may remain in the database after local video files are removed.
+Backups, provider logs, and copies already delivered to a social platform may
+remain subject to those providers' retention practices. Published content is
+not removed from a social platform when a local file is cleaned up.
+
+To request access, correction, export, or deletion of information, contact
+[PRIVACY / SUPPORT EMAIL] and identify the account or content involved. We may
+need to verify your request. You can also revoke access in the relevant
+platform's connected-app settings. Revoking access may prevent future
+publishing, but does not itself delete data already stored by us or content
+already published by you.
+
+8. Security
+
+We use reasonable technical and organizational measures. Platform tokens are
+encrypted before being stored by the application, and database access is
+intended to be restricted to the server. No method of storage or transmission
+is completely secure. Keep your admin credentials confidential, do not send
+them in chat or public issue reports, and rotate credentials if exposed. Notify
+us promptly at [SECURITY CONTACT EMAIL] if you suspect unauthorized access.
+
+9. Children
+
+The Service is not intended for children under [MINIMUM AGE, e.g. 13 or the
+higher age required in your location]. We do not knowingly collect their
+personal information. A parent or guardian who believes a child provided
+information may contact us to request its removal.
+
+10. Privacy rights and complaints
+
+Depending on where you live, you may have rights to access, correct, delete,
+restrict, object to, or obtain a copy of certain information, withdraw consent,
+or complain to a data-protection authority. Contact us at
+[PRIVACY / SUPPORT EMAIL]. We will respond as required by applicable law.
+
+11. Changes and contact
+
+We may update this notice as the Service or applicable law changes. We will
+post the updated version with a new "Last updated" date. Material changes will
+be communicated where required by law. For privacy questions, contact:
+[LEGAL NAME OR BUSINESS NAME], [POSTAL ADDRESS], [PRIVACY / SUPPORT EMAIL].
+
+PART 2 — TERMS OF SERVICE
+
+1. Agreement and eligibility
+
+By accessing or using the Service, you agree to these Terms. If you do not
+agree, do not use the Service. You must be legally able to enter a binding
+agreement and meet the minimum age required where you live. If you use the
+Service for an organization, you represent that you are authorized to bind it.
+
+2. What the Service does
+
+The Service provides tools to connect supported social-media accounts, upload
+and process video, manage publishing metadata, and request publication to a
+connected platform. Features may change or be unavailable. A connection does
+not guarantee that a platform will accept, display, or retain content.
+
+3. Your accounts and authorization
+
+You are responsible for the accounts you connect and for reviewing the
+permissions requested during platform authorization. You authorize the Service
+to access account information and perform only the actions needed for the
+features you choose, subject to the permissions granted and these Terms. You
+may revoke that authorization through the platform. You must maintain the
+security of your accounts and any Service credentials.
+
+4. Your content and permissions
+
+You retain ownership of content you provide. You represent and warrant that
+you own or have all rights, licenses, permissions, and consents needed to
+upload, process, and publish the content, including rights in music, images,
+people depicted, and other materials. Your content must not violate another
+person's rights or applicable law.
+
+You grant the Service operator a limited, non-exclusive, worldwide license to
+host, reproduce, transcode, transmit, and otherwise process your content only
+as needed to provide, secure, and troubleshoot the Service and to carry out
+publishing actions you request. This license ends when the content is deleted
+from the Service, except for copies retained in backups or logs for a limited
+period or as required by law. This grant does not transfer ownership to us.
+
+5. Acceptable use
+
+You agree not to:
+
+- use the Service unlawfully or to violate platform rules;
+- upload content you do not have permission to use;
+- misuse, probe, disrupt, or attempt to gain unauthorized access to the
+  Service, its accounts, or its infrastructure;
+- bypass authorization, rate limits, or security controls;
+- use the Service to distribute malware, spam, deceptive material, or content
+  that infringes rights or harms others.
+
+We may suspend or restrict use when reasonably necessary to protect users,
+providers, the Service, or comply with law.
+
+6. Third-party platforms and services
+
+Meta, Instagram, Facebook, Google, YouTube, hosting, database, and storage
+providers are independent third parties and may apply their own terms,
+policies, outages, eligibility rules, and technical limits. We do not control
+or guarantee their services. Your use of those platforms is also governed by
+your agreement with them.
+
+7. Availability, processing, and publishing
+
+The Service is provided on an "as available" basis. Video processing,
+authorization, and publishing may fail, be delayed, or produce different
+results due to content, configuration, network, or provider requirements.
+Unless a separate written agreement says otherwise, publication occurs only
+when you initiate a publishing action; do not rely on the Service for
+time-critical publication. You are responsible for checking the final result
+on the relevant platform.
+
+8. Fees
+
+Fees, if any, are: [STATE WHETHER THE SERVICE IS FREE OR DESCRIBE FEES,
+BILLING, TAXES, AND REFUND TERMS]. Do not leave this section incomplete if
+users will be charged.
+
+9. Suspension and termination
+
+You may stop using the Service and revoke platform authorization at any time.
+We may suspend or terminate access for breach of these Terms, security risks,
+legal requirements, or discontinuation of the Service. On termination, your
+right to use the Service ends. Data may be deleted or retained as described in
+the Privacy Notice and as required by law.
+
+10. Disclaimers
+
+To the maximum extent permitted by law, the Service is provided without
+warranties of any kind, express or implied, including warranties of
+merchantability, fitness for a particular purpose, and non-infringement. We do
+not warrant uninterrupted, secure, or error-free operation, or acceptance or
+continued availability of content on a third-party platform. Nothing in these
+Terms excludes a warranty or right that applicable law does not allow us to
+exclude.
+
+11. Limitation of liability
+
+To the maximum extent permitted by law, [LEGAL NAME OR BUSINESS NAME] will
+not be liable for indirect, incidental, special, consequential, exemplary, or
+punitive damages, loss of profits, data, goodwill, or business interruption
+arising from use of the Service. Our total liability for claims relating to
+the Service will not exceed [AMOUNT OR FEES PAID DURING A DEFINED PERIOD].
+These limits do not apply where prohibited by law or to liability that cannot
+legally be limited.
+
+12. Indemnity
+
+To the extent permitted by law, you agree to defend and indemnify [LEGAL NAME
+OR BUSINESS NAME] against third-party claims and reasonable costs arising from
+your content, your misuse of the Service, your violation of these Terms, or
+your infringement of another person's rights. This does not apply to the
+extent a claim was caused by our own unlawful conduct.
+
+13. Governing law and disputes
+
+These Terms are governed by the laws of [COUNTRY / STATE / PROVINCE], without
+regard to conflict-of-law rules, except where consumer-protection laws require
+otherwise. Courts located in [CITY / REGION] will have jurisdiction, subject
+to any mandatory rights you have under applicable law.
+
+14. Changes and general terms
+
+We may update these Terms by posting a revised version and updating the date
+above. Where required, we will provide advance notice or obtain consent.
+Continued use after an effective update means you accept the revised Terms,
+except where applicable law requires another process. If a provision is
+unenforceable, the remaining provisions remain in effect. These Terms and the
+Privacy Notice are the entire agreement about the Service unless a separate
+written agreement applies. You may not transfer your rights under these Terms
+without our consent; we may transfer them as part of a lawful business
+reorganization.
+
+15. Contact
+
+Questions about these Terms:
+[LEGAL NAME OR BUSINESS NAME]
+[POSTAL ADDRESS]
+[SUPPORT EMAIL]

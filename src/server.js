@@ -1,6 +1,6 @@
 import { randomUUID, timingSafeEqual } from "node:crypto";
 import { createReadStream, createWriteStream } from "node:fs";
-import { mkdir, rename, rm } from "node:fs/promises";
+import { mkdir, readFile, rename, rm } from "node:fs/promises";
 import http from "node:http";
 import path from "node:path";
 import { Transform } from "node:stream";
@@ -25,6 +25,20 @@ function sendJson(response, status, value) {
   });
   response.end(JSON.stringify(value));
 }
+
+function sendHtml(response, status, html) {
+  response.writeHead(status, {
+    "content-type": "text/html; charset=utf-8",
+    "cache-control": "no-store",
+    "content-security-policy":
+      "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'",
+    "referrer-policy": "no-referrer",
+    "x-content-type-options": "nosniff",
+  });
+  response.end(html);
+}
+
+const CONNECT_PAGE_URL = new URL("../public/connect.html", import.meta.url);
 
 function getErrorStatus(error) {
   if (error.statusCode) return error.statusCode;
@@ -132,6 +146,13 @@ export function createApiServer({
   return http.createServer(async (request, response) => {
     try {
       const url = new URL(request.url, "http://localhost");
+      if (
+        request.method === "GET" &&
+        (url.pathname === "/" || url.pathname === "/connect")
+      ) {
+        return sendHtml(response, 200, await readFile(CONNECT_PAGE_URL, "utf8"));
+      }
+
       if (request.method === "GET" && url.pathname === "/health") {
         return sendJson(response, 200, { status: "ok" });
       }

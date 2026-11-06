@@ -156,8 +156,11 @@ export function loadConfig(env = process.env) {
     metaRedirectUri,
     metaOAuthMode: configuredMetaOAuthMode,
     metaGraphApiVersion,
-    googleClientId: env.GOOGLE_CLIENT_ID || "",
-    googleClientSecret: env.GOOGLE_CLIENT_SECRET || "",
+    googleClientId:
+      env.GOOGLE_CLIENT_ID || env.youtube_client_id || "",
+    googleClientSecret:
+      env.GOOGLE_CLIENT_SECRET || env.youtube_client_secret || "",
+    googleRedirectUri: env.GOOGLE_REDIRECT_URI || env.youtube_redirect_uri || "",
     port,
     storageDir: path.resolve(env.STORAGE_DIR || "./storage"),
     maxStorageBytes,

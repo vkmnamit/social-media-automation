@@ -1,8 +1,9 @@
 # Social Video Publishing Backend
 
-A backend-only Node.js service for authorized video uploads, FFmpeg
+A Node.js service with a small browser page for connecting Instagram and API
+routes for authorized video uploads, FFmpeg
 vertical-video processing, official account authorization, publishing, and
-local storage cleanup. It does not provide a web dashboard. **Supabase
+local storage cleanup. It does not provide a video-management dashboard. **Supabase
 Postgres** stores asset, publishing, and encrypted OAuth metadata; video files
 remain in the configured local or persistent-volume storage directory.
 
@@ -62,6 +63,11 @@ on the configured interval.
 - Start official account authorization with `POST /api/oauth/meta/start` or
   `POST /api/oauth/google/start`. The callback returns JSON; tokens are
   encrypted before being saved, and account listings do not expose tokens.
+- Open `/connect` (or the service root) in a browser to paste the Railway admin
+  API token and start Instagram authorization. The page sends the token only
+  in an HTTPS request to this service, does not store it in browser storage,
+  and clears it before redirecting to Meta. Rotate any token previously shared
+  in chat before using the page.
 - Publish a processed video through `POST /api/assets/{id}/publish`. Instagram
   publishing uses a temporary signed Supabase Storage URL and waits for Meta
   to confirm publication before saving the post ID and URL.
@@ -100,8 +106,10 @@ If the callback fails, inspect Railway logs for the provider and stage-specific
 error; authorization codes and tokens are not logged.
 `META_GRAPH_API_VERSION` defaults to `v26.0`. `SUPABASE_MEDIA_BUCKET` defaults to the private
 `autoreel-publishing` bucket, which the server creates when needed using its
-service-role key. Configure `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` only
-if YouTube is needed.
+service-role key. Configure `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` (or
+the existing lowercase `youtube_client_id` and `youtube_client_secret`) if
+YouTube is needed. The Google redirect can be set with `GOOGLE_REDIRECT_URI`
+or `youtube_redirect_uri`; register that exact URI in the Google OAuth client.
 Generate `TOKEN_ENCRYPTION_KEY` with `openssl rand -base64 32` and use the exact
 HTTPS service origin for `PUBLIC_BASE_URL` in production. On Railway, when
 `PUBLIC_BASE_URL` is unset or still points at localhost, the service uses

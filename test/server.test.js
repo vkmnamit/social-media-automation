@@ -32,7 +32,7 @@ class TestRepository {
   }
 }
 
-test("service has no dashboard and API requires its bearer token", async (t) => {
+test("connect page is public and API requires its bearer token", async (t) => {
   const root = await mkdtemp(path.join(os.tmpdir(), "autoreel-server-"));
   const repository = new TestRepository();
   const config = {
@@ -69,8 +69,20 @@ test("service has no dashboard and API requires its bearer token", async (t) => 
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
 
   const rootResponse = await fetch(baseUrl);
-  assert.equal(rootResponse.status, 404);
-  assert.deepEqual(await rootResponse.json(), { error: "Not found" });
+  assert.equal(rootResponse.status, 200);
+  assert.match(rootResponse.headers.get("content-type"), /text\/html/);
+  assert.equal(rootResponse.headers.get("cache-control"), "no-store");
+  assert.equal(rootResponse.headers.get("referrer-policy"), "no-referrer");
+  const connectPage = await rootResponse.text();
+  assert.match(connectPage, /Connect Instagram/);
+  assert.match(connectPage, /type="password"/);
+  assert.match(connectPage, /\/api\/oauth\/meta\/start/);
+  assert.match(connectPage, /returned a webpage instead of API JSON/);
+  assert.doesNotMatch(connectPage, new RegExp(config.adminApiToken));
+
+  const connectRoute = await fetch(`${baseUrl}/connect`);
+  assert.equal(connectRoute.status, 200);
+  assert.match(await connectRoute.text(), /Paste token/);
 
   const unauthorized = await fetch(`${baseUrl}/api/assets`);
   assert.equal(unauthorized.status, 401);

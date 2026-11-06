@@ -50,6 +50,9 @@ export class OAuthService {
     if (provider === "meta" && this.config.metaRedirectUri) {
       return this.config.metaRedirectUri;
     }
+    if (provider === "google" && this.config.googleRedirectUri) {
+      return this.config.googleRedirectUri;
+    }
     return new URL(`/oauth/${provider}/callback`, this.config.publicBaseUrl).toString();
   }
 
@@ -64,7 +67,11 @@ export class OAuthService {
             (this.config.metaLoginConfigId && this.callbackUrl("meta"))),
       );
     }
-    return Boolean(this.config.googleClientId && this.config.googleClientSecret);
+    return Boolean(
+      this.config.googleClientId &&
+        this.config.googleClientSecret &&
+        this.callbackUrl("google"),
+    );
   }
 
   async createAuthorizationUrl(provider) {
